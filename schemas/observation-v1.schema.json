@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://odin-tutor.local/schemas/observation-v1.schema.json",
+  "title": "Observation stream, version 1",
+  "description": "What a debugger adapter emits, before any interpretation. The adapter reports what it saw: it assigns no identity, detects no sharing, and computes no delta. See docs/OBSERVATION-SPEC.md and docs/decisions/ADR-003.",
+  "type": "object",
+  "required": ["schema_version", "adapter", "source_file", "budgets", "records", "termination"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": 1 },
+    "adapter": { "type": "string", "description": "Adapter identifier, e.g. gdb-python/1." },
+    "odin_version": { "type": "string" },
+    "debugger": { "type": "string" },
+    "source_file": { "type": "string" },
+    "budgets": { "$ref": "#/$defs/budgets" },
+    "records": { "type": "array", "items": { "$ref": "#/$defs/record" } },
+    "termination": { "$ref": "#/$defs/termination" },
+    "detail": { "type": "string", "description": "The named reason, when termination is not Completed." },
+    "stdout": { "type": "string" },
+    "exit_code": { "type": "integer" }
+  },
+  "$defs": {
+    "value_state": {
+      "description": "0 Valid, 1 Not_Yet_Active, 2 Unreadable, 3 Unknown. Four states, never three: 'not created yet', 'I could not read it', and 'I read it and it makes no sense' point a student at different bugs. See ADR-008.",
+      "type": "integer",
+      "enum": [0, 1, 2, 3]
+    },
+    "kind": {
+      "description": "0 Scalar, 1 String, 2 Slice, 3 Dynamic_Array, 4 Fixed_Array, 5 Struct, 6 Pointer, 7 Map, 8 Opaque.",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 8
+    },
+    "termination": {
+      "description": "0 Completed, 1 Limit_Steps, 2 Limit_Wall_Time, 3 Target_Crashed, 4 Target_Became_Multithreaded, 5 Debug_Info_Missing, 6 Adapter_Failed.",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 6
+    },
+    "budgets": {
+      "description": "What the adapter declares it enforced. The core cannot verify a budget enforced at the read, so it compares this declaration with its own configuration. An adapter that lies is not detectable; that is the accepted price of enforcing read budgets at the read. See ADR-006.",
+      "type": "object",
+      "required": ["elements", "fields", "string_length", "expansions_per_step", "expansions_total", "sane_length", "steps"],
+      "additionalProperties": false,
+      "properties": {
+        "elements": { "type": "integer", "minimum": 1 },
+        "fields": { "type": "integer", "minimum": 1 },
+        "string_length": { "type": "integer", "minimum": 1 },
+        "expansions_per_step": { "type": "integer", "minimum": 1 },
+        "expansions_total": { "type": "integer", "minimum": 1 },
+        "sane_length": { "type": "integer", "minimum": 1 },
+        "steps": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "value": {
+      "type": "object",
+      "required": ["state", "kind", "type_name"],
+      "additionalProperties": false,
+      "properties": {
+        "state": { "$ref": "#/$defs/value_state" },
+        "kind": { "$ref": "#/$defs/kind" },
+        "type_name": { "type": "string" },
+        "text": { "type": "string" },
+        "address": { "type": "integer", "description": "Address of the value itself. Used only to derive identity; it never reaches the trace. See SPEC-MEM-001." },
+        "data": { "type": "integer" },
+        "length": { "type": "integer", "minimum": 0 },
+        "capacity": { "type": "integer", "minimum": 0 },
+        "elem_size": { "type": "integer", "minimum": 0, "description": "Bytes per element. The core needs it to decide whether two views overlap, which is how a sub-slice is recognised as a window onto its parent's buffer." },
+        "reason": { "type": "string", "description": "Why the state is not Valid. Required in practice for every non-Valid state: 'unknown' with no cause teaches nothing." },
+        "members": { "type": "array", "items": { "$ref": "#/$defs/variable" } }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "state": { "enum": [1, 2, 3] } }, "required": ["state"] },
+          "then": { "required": ["reason"] }
+        }
+      ]
+    },
+    "variable": {
+      "type": "object",
+      "required": ["name", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "value": { "$ref": "#/$defs/value" }
+      }
+    },
+    "frame": {
+      "type": "object",
+      "required": ["procedure", "file", "line", "depth", "variables"],
+      "additionalProperties": false,
+      "properties": {
+        "procedure": { "type": "string" },
+        "file": { "type": "string" },
+        "line": { "type": "integer", "minimum": 0 },
+        "depth": { "type": "integer", "minimum": 0 },
+        "caller_pc": { "type": "integer", "description": "The CALLER's program counter. Two calls on one source line are two call sites and therefore two return addresses, which is what tells sibling invocations apart. See SPEC-MEM-060." },
+        "caller_sp": { "type": "integer", "description": "The caller's stack pointer." },
+        "variables": { "type": "array", "items": { "$ref": "#/$defs/variable" } }
+      }
+    },
+    "returned": {
+      "description": "A value attributed to the invocation that produced it, by frame key. When attribution fails the adapter emits nothing rather than guessing. See SPEC-MEM-061.",
+      "type": "object",
+      "required": ["caller_pc", "caller_sp", "procedure", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "caller_pc": { "type": "integer" },
+        "caller_sp": { "type": "integer" },
+        "procedure": { "type": "string" },
+        "value": { "$ref": "#/$defs/value" }
+      }
+    },
+    "record": {
+      "type": "object",
+      "required": ["index", "file", "line", "frames", "stdout_len"],
+      "additionalProperties": false,
+      "properties": {
+        "index": { "type": "integer", "minimum": 0 },
+        "file": { "type": "string" },
+        "line": { "type": "integer", "minimum": 0 },
+        "frames": { "type": "array", "items": { "$ref": "#/$defs/frame" } },
+        "returned": { "type": "array", "items": { "$ref": "#/$defs/returned" } },
+        "stdout_len": { "type": "integer", "minimum": 0, "description": "Cumulative BYTES of the target's output at this stop. Bytes, not characters: the unit is in the name because a prior system lost whole documents to a character count guarding a byte limit. See SPEC-SAFE-031." }
+      }
+    }
+  }
+}

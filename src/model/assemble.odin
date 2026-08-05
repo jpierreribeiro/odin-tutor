@@ -1,0 +1,383 @@
+package tutor_model
+
+import "core:encoding/json"
+import "core:fmt"
+import "core:slice"
+import "core:strings"
+import "base:runtime"
+import vmem "core:mem/virtual"
+import tutor_obs "../obs"
+
+// Config is what the core enforces, as opposed to what the adapter enforces
+// at the read. See SAFETY.md §3 for which budget lives on which side.
+Config :: struct {
+	objects_per_step:  int,
+	trace_bytes:       int,
+	keyframe_interval: int,
+	// declared_budgets is the core's expectation of what the adapter enforced.
+	declared_budgets:  tutor_obs.Budgets,
+}
+
+DEFAULT_CONFIG :: Config {
+	objects_per_step  = 200,
+	trace_bytes       = 32 * 1024 * 1024,
+	keyframe_interval = KEYFRAME_INTERVAL,
+	declared_budgets  = {
+		elements            = 30,
+		fields              = 30,
+		string_length       = 256,
+		expansions_per_step = 32,
+		expansions_total    = 600,
+		sane_length         = 1_000_000,
+		steps               = 2500,
+	},
+}
+
+// Assembly owns every allocation the trace is made of.
+//
+// A trace's parts share one lifetime: the frames, the slots, the entities, and
+// the steps all die together. That is what an arena is for, so Assembly holds
+// one and `assembly_destroy` releases the whole trace in a single call rather
+// than walking a tree of slices. See the ownership rule below.
+//
+// OWNERSHIP: the Trace returned by `assemble` points into this arena. It is
+// valid until `assembly_destroy`. A caller that needs the trace to outlive the
+// Assembly must encode it first.
+//
+// Assembly also carries the cost accounting that keeps assembly linear.
+//
+// THE TRAP: a size check that serialises the accumulated document at every
+// step is O(n²). A prior system measured 2.0 s at 533 steps and 46.7 s at 2500,
+// inside a 15 s budget. The consequence was not slowness — the step limit
+// became unreachable, so every long trace died by timeout inside the measuring
+// code, and the student got an error where a truncated trace was correct.
+//
+// The rule: measure the new step, accumulate the number, never re-measure the
+// whole. See SPEC-PERF-020 and ADR-006.
+Assembly :: struct {
+	arena:       vmem.Arena,
+	allocator:   runtime.Allocator,
+	registry:    Registry,
+	config:      Config,
+	// bytes_so_far accumulates. It is never recomputed from the steps.
+	bytes_so_far: int,
+	truncated:   [dynamic]bool,
+	previous:    map[Id]Entity,
+	// ranges groups views that sit on one buffer. Rebuilt each step, because
+	// an address that is reused is a different storage.
+	ranges:      [dynamic]Storage_Range,
+}
+
+assembly_init :: proc(a: ^Assembly, config := DEFAULT_CONFIG) -> (err: vmem.Allocator_Error) {
+	vmem.arena_init_growing(&a.arena) or_return
+	a.allocator = vmem.arena_allocator(&a.arena)
+	registry_init(&a.registry, a.allocator)
+	a.config = config
+	a.bytes_so_far = 0
+	a.truncated = make([dynamic]bool, a.allocator)
+	a.previous = make(map[Id]Entity, a.allocator)
+	a.ranges = make([dynamic]Storage_Range, a.allocator)
+	return nil
+}
+
+// assembly_destroy releases the arena, and with it the whole trace.
+assembly_destroy :: proc(a: ^Assembly) {
+	vmem.arena_destroy(&a.arena)
+	a^ = {}
+}
+
+// step_cost measures one step and nothing else. O(new data), never O(total).
+step_cost :: proc(step: Step) -> int {
+	bytes, err := json.marshal(step, allocator = context.temp_allocator)
+	if err != nil {
+		return 0
+	}
+	// The separator the array will need.
+	return len(bytes) + 1
+}
+
+// budgets_agree compares what the adapter declared it enforced with what the
+// core expected.
+//
+// The core cannot verify a budget enforced at the read; the declaration is the
+// only check available, and an adapter that lies is not detectable. That is
+// the accepted price of enforcing read budgets at the read. See ADR-006.
+budgets_agree :: proc(declared, expected: tutor_obs.Budgets) -> bool {
+	return declared == expected
+}
+
+// assemble turns an observation stream into a trace.
+//
+// It is the one procedure that must stay linear in the number of steps.
+assemble :: proc(
+	a: ^Assembly,
+	stream: tutor_obs.Stream,
+) -> (
+	trace: Trace,
+	err: Build_Error,
+) {
+	allocator := a.allocator
+	if !budgets_agree(stream.budgets, a.config.declared_budgets) {
+		return {}, .Budget_Disagreement
+	}
+
+	steps := make([dynamic]Step, allocator)
+	interval := a.config.keyframe_interval
+	if interval < 1 {
+		interval = 1
+	}
+
+	for record, i in stream.records {
+		clear(&a.ranges)
+		is_keyframe := (i % interval) == 0
+		step := build_step(a, record, i, is_keyframe)
+		append(&a.truncated, len(step.truncations) > 0)
+
+		cost := step_cost(step)
+		if a.bytes_so_far + cost > a.config.trace_bytes {
+			trace = finish(a, stream, steps[:], .Limit_Trace_Bytes)
+			return trace, .None
+		}
+		a.bytes_so_far += cost
+		append(&steps, step)
+	}
+
+	return finish(a, stream, steps[:], termination_from_obs(stream.termination)), .None
+}
+
+finish :: proc(
+	a: ^Assembly,
+	stream: tutor_obs.Stream,
+	steps: []Step,
+	termination: Termination,
+) -> Trace {
+	return Trace {
+		trace_version     = TRACE_VERSION,
+		source_file       = stream.source_file,
+		odin_version      = stream.odin_version,
+		debugger          = stream.debugger,
+		keyframe_interval = a.config.keyframe_interval,
+		steps             = steps,
+		termination       = termination,
+		detail            = stream.detail,
+		stdout            = stream.stdout,
+		exit_code         = stream.exit_code,
+	}
+}
+
+// build_step converts one observation record.
+build_step :: proc(
+	a: ^Assembly,
+	record: tutor_obs.Record,
+	index: int,
+	keyframe: bool,
+) -> Step {
+	allocator := a.allocator
+	frames := make([dynamic]Frame_View, allocator)
+	current := make(map[Id]Entity, allocator)
+	truncations := make([dynamic]Truncation, allocator)
+
+	for frame in record.frames {
+		key := Key {
+			kind      = .Object,
+			address   = frame.caller_sp,
+			location  = frame.caller_pc,
+			type_name = frame.procedure,
+		}
+		frame_id := identity_for(&a.registry, key)
+
+		slots := make([dynamic]Slot, allocator)
+		for variable in frame.variables {
+			slot := Slot {
+				name   = variable.name,
+				state  = state_from_obs(variable.value.state),
+				reason = variable.value.reason,
+			}
+			if slot.state == .Valid {
+				#partial switch variable.value.kind {
+				case .Scalar:
+					slot.text = variable.value.text
+				case:
+					entity, id := entity_from_value(a, variable.value)
+					slot.refers_to = id
+					if len(current) < a.config.objects_per_step {
+						current[id] = entity
+						note_seen(&a.registry, variable.value.data, variable.value.type_name, index)
+					} else if len(truncations) == 0 {
+						append(&truncations, Truncation{"objects", a.config.objects_per_step})
+					}
+				}
+			}
+			append(&slots, slot)
+		}
+
+		view := Frame_View {
+			id        = frame_id,
+			procedure = frame.procedure,
+			line      = frame.line,
+			depth     = frame.depth,
+			slots     = slots[:],
+		}
+		// A return value is shown only when the adapter attributed it to this
+		// exact invocation, by frame key. Withholding is allowed; lying is not.
+		for r in record.returned {
+			if r.caller_pc == frame.caller_pc && r.caller_sp == frame.caller_sp {
+				if r.value.state == .Valid {
+					view.returned_text = r.value.text
+				}
+				break
+			}
+		}
+		append(&frames, view)
+	}
+
+	entities, removed := diff(a, current, keyframe)
+
+	return Step {
+		index       = index,
+		file        = record.file,
+		line        = record.line,
+		keyframe    = keyframe,
+		frames      = frames[:],
+		entities    = entities,
+		removed     = removed,
+		stdout_len  = record.stdout_len,
+		truncations = truncations[:],
+	}
+}
+
+// entity_from_value builds one entity and returns its identity.
+entity_from_value :: proc(
+	a: ^Assembly,
+	value: tutor_obs.Value,
+) -> (
+	entity: Entity,
+	id: Id,
+) {
+	kind: Entity_Kind = .Object
+	#partial switch value.kind {
+	case .Slice, .String, .Dynamic_Array:
+		kind = .View
+	}
+
+	key := Key {
+		kind      = kind,
+		address   = value.data,
+		location  = value.address,
+		length    = value.length,
+		type_name = value.type_name,
+		epoch     = epoch_for(&a.registry, value.data, value.type_name),
+	}
+	id = identity_for(&a.registry, key)
+
+	entity = Entity {
+		id        = id,
+		kind      = kind,
+		type_name = value.type_name,
+		text      = value.text,
+		length    = value.length,
+	}
+	if kind == .View && value.data != 0 {
+		// Two views over one buffer share a visible thing rather than being
+		// collapsed into one. Grouping is by overlap, not by pointer equality:
+		// a sub-slice starts further along the same buffer. See SPEC-MEM-005.
+		entity.shares_storage_with = storage_for(
+			&a.ranges, &a.registry,
+			value.data, value.length, value.elem_size, value.type_name, key.epoch,
+		)
+	}
+	return entity, id
+}
+
+// diff produces the entity list for a step: everything at a keyframe, only
+// what changed at a delta.
+//
+// A changed entity is emitted whole. Whole-entity replacement makes
+// materialisation trivially correct and a delta readable; the size saving of
+// field-level deltas is not worth the class of bug it invites.
+// See SPEC-TRACE-003.
+diff :: proc(
+	a: ^Assembly,
+	current: map[Id]Entity,
+	keyframe: bool,
+) -> (
+	entities: []Entity,
+	removed: []Id,
+) {
+	out := make([dynamic]Entity, a.allocator)
+	gone := make([dynamic]Id, a.allocator)
+
+	if keyframe {
+		for _, e in current {
+			append(&out, e)
+		}
+	} else {
+		for id, e in current {
+			old, existed := a.previous[id]
+			if !existed || !entity_equal(old, e) {
+				append(&out, e)
+			}
+		}
+		for id in a.previous {
+			if _, still := current[id]; !still {
+				append(&gone, id)
+			}
+		}
+	}
+
+	clear(&a.previous)
+	for id, e in current {
+		a.previous[id] = e
+	}
+
+	slice.sort_by(out[:], proc(x, y: Entity) -> bool { return x.id < y.id })
+	slice.sort(gone[:])
+	return out[:], gone[:]
+}
+
+entity_equal :: proc(x, y: Entity) -> bool {
+	if x.id != y.id || x.kind != y.kind || x.type_name != y.type_name {
+		return false
+	}
+	if x.text != y.text || x.length != y.length {
+		return false
+	}
+	if x.shares_storage_with != y.shares_storage_with {
+		return false
+	}
+	if len(x.members) != len(y.members) {
+		return false
+	}
+	for m, i in x.members {
+		if m != y.members[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// describe_termination gives the student a sentence, not an enum name.
+describe_termination :: proc(t: Trace, allocator := context.allocator) -> string {
+	switch t.termination {
+	case .Completed:
+		return strings.clone("The program ran to completion.", allocator)
+	case .Limit_Steps:
+		return strings.clone("The step limit was reached. The trace is complete up to that step.", allocator)
+	case .Limit_Wall_Time:
+		return strings.clone("The time limit was reached. The trace is complete up to that step.", allocator)
+	case .Limit_Trace_Bytes:
+		return strings.clone("The trace size limit was reached. The trace is complete up to that step.", allocator)
+	case .Target_Crashed:
+		return fmt.aprintf("The program stopped: %s", t.detail, allocator = allocator)
+	case .Target_Became_Multithreaded:
+		return strings.clone(
+			"The program started a second thread. Tracing stopped there, because memory can then change with no line of your code responsible.",
+			allocator,
+		)
+	case .Debug_Info_Missing:
+		return strings.clone("The program was built without debug information.", allocator)
+	case .Adapter_Failed:
+		return fmt.aprintf("The tracer failed: %s", t.detail, allocator = allocator)
+	}
+	return strings.clone("Unknown.", allocator)
+}
