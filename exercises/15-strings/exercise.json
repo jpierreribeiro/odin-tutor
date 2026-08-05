@@ -1,0 +1,36 @@
+{
+  "id": "15-strings",
+  "title": "A string is a pointer and a length",
+  "objective": "Show that an Odin string is a view onto bytes, with its length beside it rather than at the end.",
+  "concepts": [
+    "string",
+    "slice",
+    "length"
+  ],
+  "difficulty": 2,
+  "requires": [
+    "01-values"
+  ],
+  "entry": "start.odin",
+  "assertions": [
+    {
+      "id": "A1",
+      "at": "any",
+      "expr": "length_of(\"name\") == 3"
+    },
+    {
+      "id": "A2",
+      "at": "any",
+      "expr": "type_of(\"name\") == \"struct string\""
+    },
+    {
+      "id": "A3",
+      "at": "final",
+      "expr": "output_equals(\"Ana 3\\n\")"
+    }
+  ],
+  "hints": [
+    "hints.md"
+  ],
+  "expected_wall_ms": 3000
+}

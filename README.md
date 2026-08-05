@@ -59,7 +59,7 @@ version, drives gdb, records the observation stream beside the trace, and
 assembles it. The recorded stream replays to a byte-identical trace with gdb
 uninstalled, which is what makes every later phase testable in milliseconds.
 
-Fourteen exercises, and one command:
+Sixteen exercises, and one command:
 
 ```sh
 odin-tutor                 # start, or pick up where you left off

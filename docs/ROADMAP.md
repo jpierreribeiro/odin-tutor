@@ -428,10 +428,10 @@ frame panel incomplete.
 > `list`, `hint` — and the acceptance script gained a section for it so the same
 > gap cannot reopen silently.
 >
-> **Fourteen exercises**, on the curriculum's own ids: `01-values`,
+> **Sixteen exercises**, on the curriculum's own ids: `01-values`,
 > `02-control-flow`, `03-fixed-arrays`, `04-structs`, `05-pointers`, `06-aliasing`, `07-frames`, `08-recursion`,
-> `10-new-and-free`, `12-slices`, `13-sub-slices`, `14-dynamic-arrays`,
-> `16-utf8`, `20-errors`. Every one accepts its reference solution, rejects a plausible wrong
+> `10-new-and-free`, `11-lifetime`, `12-slices`, `13-sub-slices`,
+> `14-dynamic-arrays`, `15-strings`, `16-utf8`, `20-errors`. Every one accepts its reference solution, rejects a plausible wrong
 > one, and has a hint.
 >
 > Three of them accepted their wrong solution when first written, and the
@@ -440,8 +440,21 @@ frame panel incomplete.
 > case separates them. `16-utf8` needed the text printed beside the length, or
 > ten ASCII letters reach ten bytes and teach nothing.
 >
-> Still short of [CURRICULUM.md](CURRICULUM.md): it names about twenty, and it
-> marks several of them marginal for this tool. What is missing is content.
+> Still short of [CURRICULUM.md](CURRICULUM.md), and what is left is named
+> rather than implied: `09-fixed-containers` (covered in substance by
+> `14-dynamic-arrays`), `17-arenas`, `21-soa`, and the two the curriculum itself
+> marks marginal for this tool, `18-generics` and `19-bit-sets`.
+>
+> Three exercises had to be rewritten because their WRONG SOLUTION WAS NOT
+> WRONG. `15-strings` built its bytes by hand and converted them with
+> `string(...)`, which produces a real string — same type, same length, same
+> output — so the exercise accepted it, correctly. `08-recursion` asked
+> `returns("countdown","4")`, which the predicate cannot answer under recursion.
+> `10-new-and-free` could not distinguish a local from an allocation until
+> [SPEC-VAL-024](VALIDATION-SPEC.md#spec-val-024) existed.
+>
+> Each was caught by the acceptance script rather than by review, which is the
+> point of [SPEC-EX-052](EXERCISE-SPEC.md) having a check behind it.
 
 **Goal:** the tool becomes a course rather than a viewer.
 

@@ -1,0 +1,38 @@
+{
+  "id": "11-lifetime",
+  "title": "After you give memory back, say so",
+  "objective": "Show that a pointer to freed memory still looks like a pointer, and that nil is how you record that it is not one any more.",
+  "concepts": [
+    "allocation",
+    "free",
+    "pointer",
+    "nil",
+    "dangling"
+  ],
+  "difficulty": 3,
+  "requires": [
+    "10-new-and-free"
+  ],
+  "entry": "start.odin",
+  "assertions": [
+    {
+      "id": "A1",
+      "at": "any",
+      "expr": "is_reference(\"node\")"
+    },
+    {
+      "id": "A2",
+      "at": "any",
+      "expr": "is_nil(\"node\")"
+    },
+    {
+      "id": "A3",
+      "at": "final",
+      "expr": "output_equals(\"3 true\\n\")"
+    }
+  ],
+  "hints": [
+    "hints.md"
+  ],
+  "expected_wall_ms": 3000
+}
