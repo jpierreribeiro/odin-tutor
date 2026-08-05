@@ -10,13 +10,18 @@ stack, the variables, and the object graph at each step.
 
 ## Status
 
-**Phases 0, 1 and 2 complete.** One command takes a `.odin` file to a rendered
+**Phases 0 through 3 complete.** One command takes a `.odin` file to a rendered
 step, and the picture it draws is the memory model: identities that are never
 addresses, sub-slices shown as windows onto one buffer, pointers resolved to
-references, cycles that show their own identifier. `./check.sh` passes —
-`-vet -strict-style` clean, 49 tests across five packages, both JSON schemas
-validating the real adapter output — and every acceptance criterion of Phases 1
-and 2 is checked by a script anyone can run.
+references, cycles that show their own identifier, and return values attributed
+to the invocation that produced them. `./check.sh` passes — `-vet -strict-style`
+clean, 51 tests across five packages, both JSON schemas validating the real
+adapter output — and every acceptance criterion of Phases 1, 2 and 3 is checked
+by a script anyone can run.
+
+`fib(6)` shows **25 return values and not one that contradicts its frame**.
+Frame identity was the least validated part of the design; it now has evidence
+at depth 100.
 
 ```sh
 export ODIN_ROOT=/path/to/Odin        # core: imports fail without it
@@ -24,6 +29,7 @@ export ODIN_ROOT=/path/to/Odin        # core: imports fail without it
 ./probes/run.sh                       # does this toolchain work?
 ./tests/phase1-acceptance.sh          # is the phase done?
 ./tests/phase2-acceptance.sh
+./tests/phase3-acceptance.sh
 
 ./odin-tutor trace fixtures/programs/sub-slice.odin trace.json
 ./odin-tutor render trace.json 4
@@ -49,8 +55,8 @@ version, drives gdb, records the observation stream beside the trace, and
 assembles it. The recorded stream replays to a byte-identical trace with gdb
 uninstalled, which is what makes every later phase testable in milliseconds.
 
-Not built yet: frame identity under recursion and return values (Phase 3), the
-interactive step player (Phase 4), the validator and the exercises (Phase 5).
+Not built yet: the interactive step player (Phase 4), the validator and the
+exercises (Phase 5).
 See [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 Read [`docs/PROJECT.md`](docs/PROJECT.md) first, then
@@ -64,7 +70,7 @@ A first Phase 0 probe run took place on **2026-08-05** against Odin
 |---|---|
 | Closed by evidence | R-01, R-02, R-03, R-04, R-05, R-08, R-17, R-18 |
 | Landed; mitigation measured and required | R-19 — stepping is **not** confined to the student's source |
-| Opened by the probes | R-20 map entries unreadable · R-21 use-after-free undetectable by reading |
+| Opened by the probes | R-20 map entries unreadable ([decided](docs/decisions/ADR-014-maps-are-counted-not-walked.md)) · R-21 use-after-free undetectable by reading · R-22 `= ---` undetectable by reading |
 | Measured | 1.31 ms per student step · 0.98 s to compile |
 
 The headline result: **`fib(6)` produced 25 invocations, 25 return values, and

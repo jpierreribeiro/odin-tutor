@@ -622,6 +622,48 @@ which is a different thing.
 
 ---
 
+<a id="r-22"></a>
+### R-22 — An explicitly uninitialised local cannot be told from an initialised one
+**Class:** HIGH · **Status: ANSWERED — it cannot, by reading**
+
+Odin's `= ---` leaves the storage untouched on purpose.
+
+```odin
+x: int = ---        // line 15, gdb reports x as declared here
+y := 1              // line 16 - the FIRST step the line table has
+```
+
+**Measured 2026-08-05.** `x: int = ---` generates no code, so line 15 never
+appears in the line table and is never a step. From the first step onward the
+declaration line has passed, `yet_active` says the variable is live, and the tool
+reads the storage — which holds `140729712422976`, whatever the previous call
+left there.
+
+DWARF describes where a variable lives and where it was declared. It does not
+describe whether it has ever been assigned. There is nothing to read.
+
+**This is the same shape as [R-21](#r-21)** and it is worth stating in the same
+words: the tool is reporting the memory truthfully, and the memory is not yet
+meaningful. The `not-yet-active` state
+([SPEC-MEM-020](MEMORY-MODEL.md#spec-mem-020)) covers "the program has not
+reached the declaration", which the tool CAN determine. It does not cover "the
+declaration was reached and deliberately wrote nothing", which it cannot.
+
+**What still works.** The case the state was built for — a local or an argument
+read *before* its declaration line — is detected and produces `not-yet-active`.
+That is the `prologue` fixture, and it passes. The gap is `= ---` alone, which a
+student writes rarely and deliberately.
+
+**What must not be claimed.** That the tool detects reading an uninitialised
+variable. It does not. `uninitialised-local` is a fixture that records a limit,
+like `dangling-pointer`, not one that asserts a safeguard.
+
+**The path, if it is ever worth taking:** a `DW_AT_location` range that begins at
+the first assignment would answer it, and Odin does not emit one. Otherwise it
+needs the same machinery as Phase 6 — watching writes rather than reading state.
+
+---
+
 <a id="r-21"></a>
 ### R-21 — Use-after-free cannot be detected by reading
 **Class:** HIGH · **Status: ANSWERED — it cannot**

@@ -289,6 +289,23 @@ is documented and tested as a gap.
 
 ## Phase 3 — Frames and return values
 
+> **Built 2026-08-05.** All four acceptance criteria are checked by
+> [`tests/phase3-acceptance.sh`](../tests/phase3-acceptance.sh), 11 checks.
+> `fib(6)` shows **25 return values and none contradicting its frame**, which is
+> what the Phase 0 probe predicted. `deep-recursion` holds 101 distinct frame
+> identities at depth 100 with no wrong value.
+>
+> Two defects were found by wiring it. Attribution compared only the return
+> address and the caller's stack pointer, dropping the procedure name — so a
+> return from one procedure could be attributed to another called from the same
+> site. And a return is observed AFTER its frame leaves the stack, so it was
+> never attributable to a frame in the record carrying it; it is now given back
+> to the last step at which that invocation was on screen.
+>
+> One limit was measured and recorded: [R-22](RISKS.md#r-22). `= ---` generates
+> no code, so its declaring line is never a step and an explicitly uninitialised
+> local cannot be told from an initialised one by reading.
+
 **Goal:** frame identity that survives recursion, and return values that are
 never wrong.
 

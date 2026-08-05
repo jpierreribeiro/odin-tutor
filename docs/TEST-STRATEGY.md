@@ -95,7 +95,7 @@ important tests in the repository.
 | `sub-slice` | a sub-slice is drawn with the parent's length | two view identities, one storage, lengths 3 and 2, sharing recorded |
 | `two-equal-lists` | equal contents become one object | two identities |
 | `prologue` | "no variables" at a call step | `variable_state == not_yet_active`, and the render does not say "no variables" |
-| `uninitialised-local` | stack garbage shown as a value | state is `not-yet-active` at the declaring line, `valid` after |
+| `uninitialised-local` | — **records a limit, does not assert a safeguard.** [R-22](RISKS.md#r-22): `= ---` generates no code, so its declaring line is never a step and the tool reads the storage. Asserts the CURRENT behaviour, so a change is loud |
 | `fibonacci` | a return value attributed to the wrong invocation | **no shown return value contradicts its frame's argument** |
 | `two-calls-one-line` | one frame identity for two invocations | two frame identities |
 | `cycle` | infinite expansion, or a hidden cycle | terminates; a field refers to its own object identity |

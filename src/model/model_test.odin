@@ -301,13 +301,68 @@ a_matching_return_value_is_shown :: proc(t: ^testing.T) {
 	assert(assembly_init(&a) == nil)
 	defer assembly_destroy(&a)
 
+	// `one_frame` names its procedure "main", and the returned record must name
+	// the SAME procedure. It used to say "soma" and still matched, because
+	// attribution compared only the return address and the stack pointer - so a
+	// return from one procedure was attributed to a frame of another. That is a
+	// wrong return value, and SPEC-MEM-060's key has three parts for this reason.
 	mine   := one_frame({}, pc = 0x100, sp = 0x200)
 	record := tutor_obs.Record {
 		index = 0, line = 3, frames = {mine},
-		returned = {{caller_pc = 0x100, caller_sp = 0x200, procedure = "soma", value = scalar("24")}},
+		returned = {{caller_pc = 0x100, caller_sp = 0x200, procedure = "main", value = scalar("24")}},
 	}
 	trace, _ := assemble(&a, stream_of({record}))
 	testing.expect_value(t, trace.steps[0].frames[0].returned_text, "24")
+}
+
+@(test)
+a_return_from_a_different_procedure_is_withheld :: proc(t: ^testing.T) {
+	// Same call site, same stack slot, different procedure. Two procedures can
+	// be called from one address at different times, and the stack pointer is
+	// reused. Only the name separates them.
+	//
+	// SPEC-MEM-061: when the invocation cannot be determined, record nothing. A
+	// measured failure from a working system had a frame holding n = 0 report
+	// that it returned 8, the answer for fib(6). No return value teaches
+	// nothing, which is better than teaching that fib(0) is 8.
+	a: Assembly
+	assert(assembly_init(&a) == nil)
+	defer assembly_destroy(&a)
+
+	mine   := one_frame({}, pc = 0x100, sp = 0x200)
+	record := tutor_obs.Record {
+		index = 0, line = 3, frames = {mine},
+		returned = {{caller_pc = 0x100, caller_sp = 0x200, procedure = "other", value = scalar("24")}},
+	}
+	trace, _ := assemble(&a, stream_of({record}))
+	testing.expect_value(t, trace.steps[0].frames[0].returned_text, "")
+}
+
+@(test)
+a_return_is_attributed_to_the_step_where_its_frame_was_live :: proc(t: ^testing.T) {
+	// A return is observed AFTER its frame has left the stack, so it is never
+	// attributable to a frame in the record that carries it. It belongs to the
+	// invocation that produced it, which is on screen at the earlier steps.
+	//
+	// Step 0 and 1 hold the callee. Step 2 is back in the caller and carries the
+	// return. The value must land on step 1 - the LAST step where the callee was
+	// live - and nowhere else.
+	a: Assembly
+	assert(assembly_init(&a) == nil)
+	defer assembly_destroy(&a)
+
+	callee := one_frame({}, pc = 0x100, sp = 0x200)
+	caller := one_frame({}, pc = 0x900, sp = 0x800)
+	trace, _ := assemble(&a, stream_of({
+		{index = 0, line = 1, frames = {callee}},
+		{index = 1, line = 2, frames = {callee}},
+		{index = 2, line = 3, frames = {caller},
+		 returned = {{caller_pc = 0x100, caller_sp = 0x200, procedure = "main", value = scalar("42")}}},
+	}))
+
+	testing.expect_value(t, trace.steps[0].frames[0].returned_text, "")
+	testing.expect_value(t, trace.steps[1].frames[0].returned_text, "42")
+	testing.expect_value(t, trace.steps[2].frames[0].returned_text, "")
 }
 
 @(test)

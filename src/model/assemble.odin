@@ -66,6 +66,26 @@ Assembly :: struct {
 	// ranges groups views that sit on one buffer. Rebuilt each step, because
 	// an address that is reused is a different storage.
 	ranges:      [dynamic]Storage_Range,
+	// frame_positions remembers where each invocation was last on screen.
+	//
+	// A return value is observed AFTER its frame has left the stack, so it can
+	// never be attributed to a frame in the record that carries it. It belongs
+	// to the invocation that produced it, and that invocation is visible at the
+	// steps before it returned. This is how the value gets back to it.
+	frame_positions: map[Frame_Key]Frame_Position,
+}
+
+// Frame_Key is SPEC-MEM-060's key, whole: the return address in the caller, the
+// caller's stack pointer, and the procedure name.
+Frame_Key :: struct {
+	caller_pc: u64,
+	caller_sp: u64,
+	procedure: string,
+}
+
+Frame_Position :: struct {
+	step:  int,
+	frame: int,
 }
 
 assembly_init :: proc(a: ^Assembly, config := DEFAULT_CONFIG) -> (err: vmem.Allocator_Error) {
@@ -77,6 +97,7 @@ assembly_init :: proc(a: ^Assembly, config := DEFAULT_CONFIG) -> (err: vmem.Allo
 	a.truncated = make([dynamic]bool, a.allocator)
 	a.previous = make(map[Id]Entity, a.allocator)
 	a.ranges = make([dynamic]Storage_Range, a.allocator)
+	a.frame_positions = make(map[Frame_Key]Frame_Position, a.allocator)
 	return nil
 }
 
@@ -140,6 +161,7 @@ assemble :: proc(
 		}
 		a.bytes_so_far += cost
 		append(&steps, step)
+		attribute_returns(a, steps[:], record)
 	}
 
 	return finish(a, stream, steps[:], termination_from_obs(stream.termination)), .None
@@ -162,6 +184,47 @@ finish :: proc(
 		detail            = stream.detail,
 		stdout            = stream.stdout,
 		exit_code         = stream.exit_code,
+	}
+}
+
+// attribute_returns gives each observed return value back to the invocation
+// that produced it.
+//
+// A return is observed after its frame has left the stack, so it is never
+// attributable to a frame in the record that carries it. It is attributed by the
+// WHOLE key of SPEC-MEM-060 — return address, caller's stack pointer, procedure
+// name — to the last step at which that invocation was on screen.
+//
+// Attribution is by key and never by firing order. `fib(n-1) + fib(n-2)` puts
+// two calls on one source line: the debugger enters and leaves the first without
+// stopping at the caller's level, so depth never changes and order says nothing
+// about which invocation returned.
+//
+// A key that does not resolve WITHHOLDS. SPEC-MEM-061: a measured failure from a
+// working system had a frame holding n = 0 report that it returned 8, the answer
+// for fib(6). A wrong return value teaches that fib(0) is 8. No return value
+// teaches nothing, which is better.
+attribute_returns :: proc(a: ^Assembly, steps: []Step, record: tutor_obs.Record) {
+	for r in record.returned {
+		if r.value.state != .Valid {
+			continue
+		}
+		key := Frame_Key{r.caller_pc, r.caller_sp, r.procedure}
+		position, found := a.frame_positions[key]
+		if !found {
+			continue
+		}
+		if position.step < 0 || position.step >= len(steps) {
+			continue
+		}
+		frames := steps[position.step].frames
+		if position.frame < 0 || position.frame >= len(frames) {
+			continue
+		}
+		frames[position.frame].returned_text = r.value.text
+		// One invocation returns once. Forgetting the key here means a sibling
+		// that reuses the same stack slot cannot inherit this value.
+		delete_key(&a.frame_positions, key)
 	}
 }
 
@@ -275,16 +338,11 @@ build_step :: proc(
 			depth     = frame.depth,
 			slots     = slots[:],
 		}
-		// A return value is shown only when the adapter attributed it to this
-		// exact invocation, by frame key. Withholding is allowed; lying is not.
-		for r in record.returned {
-			if r.caller_pc == frame.caller_pc && r.caller_sp == frame.caller_sp {
-				if r.value.state == .Valid {
-					view.returned_text = r.value.text
-				}
-				break
-			}
-		}
+		// Where this invocation is on screen, so a return value observed later
+		// can find it. Overwritten each time the frame is seen, which is what
+		// makes it the LAST step before the return.
+		a.frame_positions[Frame_Key{frame.caller_pc, frame.caller_sp, frame.procedure}] =
+			Frame_Position{step = index, frame = len(frames)}
 		append(&frames, view)
 	}
 

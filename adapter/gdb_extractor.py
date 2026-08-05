@@ -552,6 +552,56 @@ def collect_frames(frame, expansion=None):
     return frames
 
 
+class ReturnWatch(gdb.FinishBreakpoint):
+    """Catches one invocation's return value and attributes it to that frame.
+
+    THE TRAP, and it cost the probe run its first conclusion: `stop()` returning
+    True on a recursive procedure that also carries an ordinary breakpoint does
+    NOT fire as expected. The deeper call interleaves first, and the reading was
+    "return values are not observable". They are. Return False.
+
+    Attribution is by the frame key, never by firing order. `fib(n-1) + fib(n-2)`
+    puts two calls on one source line; the debugger enters and leaves the first
+    without stopping at the caller's level, so depth never changes and order says
+    nothing about which invocation returned. Two calls on one line are two call
+    sites, so two return addresses. See SPEC-MEM-060.
+    """
+
+    def __init__(self, run, frame, key, procedure):
+        super().__init__(frame, internal=True)
+        self.run = run
+        self.key = key
+        self.procedure = procedure
+
+    def stop(self):
+        try:
+            value = self.return_value
+        except Exception:  # noqa: BLE001
+            value = None
+        if value is not None:
+            self.run.pending_returns.append({
+                "caller_pc": self.key[0],
+                "caller_sp": self.key[1],
+                "procedure": self.procedure,
+                "value": read_value(value),
+            })
+        self.run.watched.discard(self.watch_key())
+        return False
+
+    def out_of_scope(self):
+        # The frame left without a normal return, so which invocation this
+        # belonged to is no longer determinable. Record NOTHING.
+        #
+        # SPEC-MEM-061: a measured failure from a working system had a frame
+        # holding n = 0 report that it returned 8, the answer for fib(6). A wrong
+        # return value teaches that fib(0) is 8. No return value teaches nothing,
+        # which is better.
+        self.run.watched.discard(self.watch_key())
+
+    def watch_key(self):
+        return (self.key[0], self.key[1], self.procedure)
+
+
 class Run:
     def __init__(self):
         self.records = []
@@ -563,6 +613,16 @@ class Run:
         # Per TRACE, not per step. Cost is steps x expansions per step, so a
         # per-step bound alone leaves the product unbounded. See SPEC-PERF-021.
         self.expansions_total = 0
+        # Returns observed since the last record was written. They are attached
+        # to the step at which they became visible.
+        self.pending_returns = []
+        # Frame keys that already carry a watch, so one invocation is not
+        # watched twice. A sibling reusing the same stack slot gets a fresh one,
+        # because the key is discarded when the frame returns.
+        self.watched = set()
+        # The watches themselves. Held so Python does not collect them while gdb
+        # still owns the breakpoint.
+        self.watches = {}
 
     def on_new_thread(self, event):
         # Detection is by event, not by counting.
@@ -653,6 +713,18 @@ def main():
             except gdb.error:
                 break
 
+        # Watch this invocation for its return value, once.
+        pc, sp = frame_key(frame)
+        procedure = str(frame.name())
+        watch_key = (pc, sp, procedure)
+        if watch_key not in run.watched:
+            try:
+                run.watches[watch_key] = ReturnWatch(run, frame, (pc, sp), procedure)
+                run.watched.add(watch_key)
+            except Exception:  # noqa: BLE001
+                # The outermost frame has nothing to return to. Not an error.
+                pass
+
         sal = frame.find_sal()
         expansion = Expansion(run)
         frames = collect_frames(frame, expansion)
@@ -663,9 +735,10 @@ def main():
             "line": sal.line if sal else 0,
             "frames": frames,
             "objects": expansion.objects,
-            "returned": [],
+            "returned": run.pending_returns,
             "stdout_len": 0,
         }
+        run.pending_returns = []
         if expansion.truncated:
             # A budget stopped the reading. Saying so is the difference between
             # "the graph ends here" and "we stopped looking". SPEC-SAFE-030.
