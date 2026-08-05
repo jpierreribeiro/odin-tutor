@@ -8,15 +8,22 @@ package tutor_cli
 import "core:fmt"
 import "core:os"
 import "core:strconv"
+import "core:strings"
 import tutor_model "../model"
 import tutor_obs "../obs"
 import tutor_preflight "../preflight"
 import tutor_render "../render"
+import tutor_toolchain "../toolchain"
 
 USAGE :: `odin-tutor — see what your Odin program does to memory
 
   odin-tutor preflight
       Check the toolchain and report what was found.
+
+  odin-tutor trace <program.odin> <trace.json>
+      Compile the program, run it once under the debugger, and write the trace.
+      The observation stream is written beside it, as <trace.json>.observations,
+      so the same trace can be rebuilt with `+"`assemble`"+` and no debugger at all.
 
   odin-tutor assemble <observations.json> <trace.json>
       Turn an adapter's observation stream into a trace.
@@ -26,8 +33,9 @@ USAGE :: `odin-tutor — see what your Odin program does to memory
 
   odin-tutor version
 
-Nothing here reaches the network, and nothing is written outside the paths you
-name.`
+Nothing here reaches the network. Nothing is written outside the paths you name,
+except built executables, which are cached under $XDG_CACHE_HOME/odin-tutor so
+that your own directory is left exactly as you left it.`
 
 main :: proc() {
 	args := os.args[1:]
@@ -39,6 +47,12 @@ main :: proc() {
 	switch args[0] {
 	case "preflight":
 		os.exit(cmd_preflight())
+	case "trace":
+		if len(args) != 3 {
+			fmt.eprintln("trace needs a .odin file and an output path")
+			os.exit(2)
+		}
+		os.exit(cmd_trace(args[1], args[2]))
 	case "assemble":
 		if len(args) != 3 {
 			fmt.eprintln("assemble needs an input and an output path")
@@ -71,26 +85,131 @@ main :: proc() {
 	}
 }
 
-cmd_preflight :: proc() -> int {
+// examine runs the whole of preflight and reports what it found.
+//
+// It is shared by the `preflight` command and by `trace`, because a trace
+// produced on an unchecked toolchain is exactly the case SPEC-PLAT-030 exists to
+// prevent: the tool's correctness depends on the debug information a specific
+// compiler emits, and that is not a constant.
+examine :: proc(allocator := context.allocator) -> (tutor_preflight.Report, tutor_toolchain.Versions) {
 	report: tutor_preflight.Report
 
 	if !tutor_preflight.find_tool("odin") {
 		report.failure = .Odin_Missing
-	} else if !tutor_preflight.find_tool("gdb") {
-		report.failure = .Debugger_Missing
+		return report, {}
 	}
+	if !tutor_preflight.find_tool("gdb") {
+		report.failure = .Debugger_Missing
+		return report, {}
+	}
+
+	versions, detect_failure := tutor_toolchain.detect(allocator)
+	if detect_failure != .None {
+		report.failure = detect_failure == .Odin_Missing ? .Odin_Missing : .Debugger_Missing
+		return report, versions
+	}
+
+	report.odin_version = versions.odin
+	report.debugger_version = versions.debugger
+	report.debugger_python = tutor_preflight.has_python(versions.debugger_configuration)
+	if !report.debugger_python {
+		report.failure = .Debugger_Without_Python
+		return report, versions
+	}
+
+	report.listed, report.failure = tutor_preflight.classify(versions.odin, versions.debugger)
+	return report, versions
+}
+
+cmd_preflight :: proc() -> int {
+	report, _ := examine(context.temp_allocator)
 
 	if report.failure != .None {
 		fmt.eprintln(tutor_preflight.explain(report.failure, context.temp_allocator))
 		return 1
 	}
 
-	fmt.println("odin   found on PATH")
-	fmt.println("gdb    found on PATH")
+	fmt.printfln("odin   %s", report.odin_version)
+	fmt.printfln("gdb    %s", report.debugger_version)
+	fmt.println("       built with Python, which the tracer runs inside")
 	fmt.println()
-	fmt.println("Version detection and the compatibility check run once the adapter is wired.")
-	fmt.println("See docs/ROADMAP.md, Phase 1.")
+	if report.listed {
+		fmt.println("This combination is in the compatibility matrix, backed by a committed probe run.")
+	} else {
+		fmt.println(tutor_preflight.warning(report, context.temp_allocator))
+	}
 	return 0
+}
+
+cmd_trace :: proc(source_path, trace_path: string) -> int {
+	report, versions := examine(context.temp_allocator)
+	if report.failure != .None {
+		fmt.eprintln(tutor_preflight.explain(report.failure, context.temp_allocator))
+		return 1
+	}
+	if !report.listed {
+		// A warning, not a refusal. Refusing would make the tool unusable the
+		// day a new Odin is released, and the student would have no way to tell
+		// a real defect from an untested version. See ADR-009.
+		fmt.eprintln(tutor_preflight.warning(report, context.temp_allocator))
+	}
+
+	built, build_failure := tutor_toolchain.build(source_path, versions, context.temp_allocator)
+	if build_failure != .None {
+		if built.diagnostics != "" {
+			fmt.eprint(built.diagnostics)
+		}
+		fmt.eprintln(tutor_toolchain.explain(build_failure, context.temp_allocator))
+		return 1
+	}
+	fmt.printfln("%s  %s", built.cached ? "cached" : "built ", source_path)
+
+	observations_path := strings.concatenate(
+		{trace_path, ".observations"}, context.temp_allocator,
+	)
+	adapter_path := adapter_location(context.temp_allocator)
+
+	diagnostics, trace_failure := tutor_toolchain.trace(
+		tutor_toolchain.Trace_Request{
+			executable        = built.executable,
+			source_path       = source_path,
+			observations_path = observations_path,
+			adapter_path      = adapter_path,
+			versions          = versions,
+		},
+		context.temp_allocator,
+	)
+	if trace_failure != .None {
+		if diagnostics != "" {
+			fmt.eprint(diagnostics)
+		}
+		fmt.eprintln(tutor_toolchain.explain(trace_failure, context.temp_allocator))
+		return 1
+	}
+	fmt.printfln("traced  %s", observations_path)
+
+	// The trace is assembled from the file, not from anything held in memory
+	// during the run. That is what makes the recorded stream a real replay: if
+	// this path works, `assemble` on the same file works with gdb uninstalled
+	// (ROADMAP Phase 1, acceptance 3).
+	return cmd_assemble(observations_path, trace_path)
+}
+
+// adapter_location finds the extractor.
+//
+// TUTOR_ADAPTER so a test can point at a copy, otherwise the repository layout.
+// Both are named paths. The adapter is NOT searched for in the working
+// directory: an adapter found that way is an adapter an exercise could replace,
+// and it runs inside the debugger (SPEC-SAFE-040).
+//
+// This is the version 1 answer and it assumes the tool runs from the repository
+// root. An installed build needs a real install path, which is a packaging
+// decision this project has not made.
+adapter_location :: proc(allocator := context.allocator) -> string {
+	if from_env := os.get_env("TUTOR_ADAPTER", context.temp_allocator); from_env != "" {
+		return strings.clone(from_env, allocator)
+	}
+	return strings.clone("adapter/gdb_extractor.py", allocator)
 }
 
 cmd_assemble :: proc(input_path, output_path: string) -> int {

@@ -10,21 +10,28 @@ stack, the variables, and the object graph at each step.
 
 ## Status
 
-**Phase 1 skeleton, built and green.** It compiles, it runs end to end on a real
-Odin program under gdb, and `./check.sh` passes: `-vet -strict-style` clean,
-36 tests across four packages, both JSON schemas validating the real adapter
-output.
+**Phases 0 and 1 complete.** One command takes a `.odin` file to a rendered
+step. `./check.sh` passes — `-vet -strict-style` clean, 42 tests across five
+packages, both JSON schemas validating the real adapter output — and all six of
+Phase 1's acceptance criteria are checked by a script anyone can run.
 
 ```sh
 export ODIN_ROOT=/path/to/Odin        # core: imports fail without it
-./check.sh
-./odin-tutor assemble fixtures/observations/fixture-obs.json trace.json
-./odin-tutor render trace.json 30
+./check.sh                            # is the code correct?
+./probes/run.sh                       # does this toolchain work?
+./tests/phase1-acceptance.sh          # is the phase done?
+
+./odin-tutor trace fixtures/programs/sub-slice.odin trace.json
+./odin-tutor render trace.json 3
 ```
 
-Not built yet: the interactive step player, the validator, the exercises, and
-the wiring that runs `odin build` and gdb from inside the tool. See
-[`docs/ROADMAP.md`](docs/ROADMAP.md).
+`trace` runs preflight, compiles with a cache keyed by source **and** Odin
+version, drives gdb, records the observation stream beside the trace, and
+assembles it. The recorded stream replays to a byte-identical trace with gdb
+uninstalled, which is what makes every later phase testable in milliseconds.
+
+Not built yet: the interactive step player, the validator, and the exercises.
+See [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 Read [`docs/PROJECT.md`](docs/PROJECT.md) first, then
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).

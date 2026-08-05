@@ -43,11 +43,16 @@ Known :: struct {
 	good:            bool,
 }
 
-// KNOWN_TOOLCHAINS is the matrix. One row, from the run committed under
-// fixtures/toolchain/. It is deliberately short: a combination the project
+// KNOWN_TOOLCHAINS is the matrix. Every row comes from a probe run committed
+// under fixtures/toolchain/. It is deliberately short: a combination the project
 // cannot prove does not belong here.
+//
+// This table and the one in PLATFORM-SUPPORT.md §5 say the same thing. When they
+// disagree, the document is what the next agent reads, so the code is what is
+// wrong (AGENT-GUIDE Rule 3).
 KNOWN_TOOLCHAINS :: []Known {
 	{odin_prefix = "dev-2026-08", debugger_prefix = "GNU gdb (Ubuntu 15.1", good = true},
+	{odin_prefix = "dev-2026-07-nightly", debugger_prefix = "GNU gdb (Ubuntu 15.0.50", good = true},
 }
 
 // explain turns a failure into a sentence a student can act on.

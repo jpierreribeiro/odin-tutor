@@ -220,8 +220,8 @@ build :: proc(
 	result: Build_Result,
 	failure: Failure,
 ) {
-	source_bytes, read_ok := os.read_entire_file(source_path, context.temp_allocator)
-	if !read_ok {
+	source_bytes, read_err := os.read_entire_file(source_path, context.temp_allocator)
+	if read_err != nil {
 		return {}, .Source_Unreadable
 	}
 

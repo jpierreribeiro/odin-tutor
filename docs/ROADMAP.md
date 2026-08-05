@@ -122,9 +122,15 @@ a drift.
 > keyframes and deltas, identity with the epoch guard, overlap-based storage
 > grouping, the four value states, the plain renderer, and the GDB extractor.
 >
+> **The wiring landed on 2026-08-05.** `odin-tutor trace <program.odin>
+> <trace.json>` runs preflight, compiles with a cache keyed by source and Odin
+> version, drives gdb through the extractor, records the observation stream, and
+> assembles the trace. All six acceptance criteria below are checked by
+> [`tests/phase1-acceptance.sh`](../tests/phase1-acceptance.sh), which a person
+> other than its author can run.
+>
 > What is not built: the interactive step player (Phase 4), the validator
-> (Phase 5), the build cache, and the wiring that runs `odin build` and gdb
-> from inside the tool. `assemble` and `render` are driven by hand today.
+> (Phase 5), and the exercises.
 >
 > Three defects the live run caught, each now a test:
 > a variable before its declaration line reported stack garbage as a value;
