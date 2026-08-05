@@ -591,7 +591,7 @@ source line, which is slower and is bounded by
 
 <a id="r-20"></a>
 ### R-20 — Map entries are not readable through the type
-**Class:** HIGH · **Status: LANDED, 2026-08-05**
+**Class:** HIGH · **Status: LANDED 2026-08-05, DECIDED by [ADR-014](decisions/ADR-014-maps-are-counted-not-walked.md)**
 
 ```
 map[string]int  →  struct map[string]int, fields ['data', 'len', 'allocator']
@@ -606,18 +606,19 @@ a composite the model recognises. Slice and string are `{data, len}` and were
 trivial. **Map is not in the same class** and should never have been listed
 beside them.
 
-**Options, none chosen yet:**
+**Decided by [ADR-014](decisions/ADR-014-maps-are-counted-not-walked.md),
+2026-08-05: counted, not walked.** A map is recorded with its type and its entry
+count, and its entries are `unknown`.
 
-1. Version 1 shows a map as `map (N entries)` with no entries, marked truncated.
-   Honest, cheap, and loses the lesson maps are used to teach.
-2. Decode the layout, pinned to one Odin version, with a probe that fails loudly
-   when the layout changes.
-3. Drop maps from the version 1 curriculum and say so.
+Decoding the layout was rejected for version 1 because it produces **wrong
+pairs** when it is wrong, and fails silently on a toolchain update: the layout
+changes, the decoder still produces pairs, and nothing signals that they are
+garbage. Dropping maps from the curriculum was rejected because it does not
+apply — a student's own program may contain a map whatever the curriculum says,
+so the tool needs this answer either way.
 
-**This is an open decision, not a defect.** It needs an ADR. Option 1 is the
-safe default and is what happens if nothing is decided, because
-[SPEC-SAFE-011](SAFETY.md#spec-safe-011) already says an uninterpretable value is
-`unknown`.
+The risk is not closed, because the gap in the teaching is real. It is **decided**,
+which is a different thing.
 
 ---
 

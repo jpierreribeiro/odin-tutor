@@ -90,6 +90,7 @@ Read in this order.
 | [CURRICULUM.md](docs/CURRICULUM.md) | What order do the exercises teach in? |
 | [decisions/](docs/decisions/) | Architecture decision records (`ADR-*`). |
 | [ADR-013](docs/decisions/ADR-013-odin-conventions.md) | **How is the Odin written?** Read before touching `src/`. |
+| [ADR-014](docs/decisions/ADR-014-maps-are-counted-not-walked.md) | Why a map shows a count and no entries. |
 
 ## The one rule that outranks the others
 

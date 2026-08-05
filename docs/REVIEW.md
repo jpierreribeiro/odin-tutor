@@ -283,9 +283,11 @@ The list a reader should hold onto.
    measured. Navigation latency, startup, trace size, and memory are **not**.
    Those four still read like commitments and are not.
 
-9. **Maps.** [R-20](RISKS.md#r-20). The type gives no entry access, and the
-   decision about what to do has not been made. Until it is, a map shows its
-   count and marks its entries `unknown`.
+9. **Maps.** [R-20](RISKS.md#r-20). The type gives no entry access. **Decided
+   by [ADR-014](decisions/ADR-014-maps-are-counted-not-walked.md):** a map shows
+   its count and marks its entries `unknown`, and the model does not walk it.
+   The gap in the teaching is real and stays written down; what changed is that
+   it is now a choice rather than a default nobody made.
 
 10. **Use after free.** [R-21](RISKS.md#r-21). Not detectable by reading, at
     all. The documentation must not imply otherwise, and Phase 6 is the only

@@ -95,7 +95,7 @@ exposes `data`, `len`, and `allocator`, and nothing else.
 
 There is no map exercise in the list above, and that is deliberate. An exercise
 about a container the picture cannot open is a worse experience than no
-exercise. If R-20 is decided in favour of decoding the layout, `12b-maps` joins
+exercise. If [ADR-014](decisions/ADR-014-maps-are-counted-not-walked.md) is ever revisited in favour of decoding the layout, `12b-maps` joins
 the list; until then it does not exist.
 
 ---
