@@ -5,10 +5,14 @@ These are the throwaway scripts from the 2026-08-05 run, kept because a claim in
 evidence beside it.
 
 They are **not** the probe suite. The probe suite
-([SPEC-TEST-041](../../docs/TEST-STRATEGY.md#spec-test-041)) is a Phase 0
-deliverable that does not exist yet: repeatable, exit-coded, and emitting the
-report rather than being read by a human. These scripts are what that suite is
-built from.
+([SPEC-TEST-041](../../docs/TEST-STRATEGY.md#spec-test-041)) now exists at
+[`probes/`](../../probes/): repeatable, exit-coded, and emitting the report
+rather than being read by a human. Run that, not these.
+
+These scripts are what it was built from, and they are kept because the claim in
+[PLATFORM-SUPPORT.md](../../docs/PLATFORM-SUPPORT.md) §5 for the
+`dev-2026-08:9caff63` row rests on this run rather than on the suite. Deleting
+them would leave that row without its evidence.
 
 ## Environment
 

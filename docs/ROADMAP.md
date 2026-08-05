@@ -47,9 +47,18 @@ picture, which is the product's core.
 > [SPEC-ADP-014](DEBUGGER-ADAPTER.md#spec-adp-014). R-06 measured at 1.31 ms per
 > step. **Phase 1 is unblocked.**
 >
-> The phase is not finished: the full fixture-program set does not exist yet,
-> and the probe suite is not yet a committed, repeatable script. Both are
-> required before a second combination can be claimed.
+> **Both remaining deliverables landed on 2026-08-05.** The 34 fixture programs
+> of [TEST-STRATEGY.md](TEST-STRATEGY.md) §5 are in
+> [`fixtures/programs/`](../fixtures/programs/), and the probe suite is at
+> [`probes/`](../probes/): repeatable, exit-coded, and emitting its own report.
+> A second combination has been claimed with it — Odin
+> `dev-2026-07-nightly:819fdc7` with gdb 15.0.50 — so the mechanism is proven
+> rather than assumed.
+>
+> Two findings from that work are recorded rather than fixed:
+> [R-20](RISKS.md#r-20) still stands, and the `free-then-allocate` fixture
+> needed a warm-up loop before it exercised the case it exists for. See
+> [`fixtures/programs/README.md`](../fixtures/programs/README.md).
 
 **Goal:** answer R-01, R-02, R-03 with evidence, and gather first numbers for
 R-04, R-05, R-06.

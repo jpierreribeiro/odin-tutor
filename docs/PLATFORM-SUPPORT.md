@@ -147,12 +147,19 @@ routine update.
 
 ### Compatibility table
 
-One row, from a probe run that is committed. Do not add a row without evidence
-from the probe suite.
+Every row comes from a probe run that is committed. Do not add a row without
+evidence from the probe suite.
 
 | Odin version | Debugger | Platform | Status | Evidence |
 |---|---|---|---|---|
 | `dev-2026-08:9caff63` (LLVM 18.1.3) | GNU gdb 15.1, with Python | Ubuntu 24.04, x86-64 | **Supported, with one required mitigation** | [`fixtures/toolchain/2026-08-05-linux-x86_64.md`](../fixtures/toolchain/2026-08-05-linux-x86_64.md) |
+| `dev-2026-07-nightly:819fdc7` | GNU gdb 15.0.50.20240403-git, with Python | Ubuntu, x86-64 | **Supported, with one required mitigation** | [`fixtures/toolchain/2026-08-05-linux-x86_64-dev-2026-07.md`](../fixtures/toolchain/2026-08-05-linux-x86_64-dev-2026-07.md) |
+
+The second row is the first one produced by [`probes/`](../probes/) rather than
+by hand. Both facts recorded under the first row held on it: the entry procedure
+resolves as `main::main`, and stepping needed the same mitigation. `frame-key`
+reproduced at depth 7 with a stable key, and `finish-breakpoint` attributed all
+25 invocations of `fib(6)` with zero wrong values.
 
 Two facts from that run are toolchain-specific and are recorded here because
 they will change:
