@@ -1,5 +1,5 @@
 {
-  "id": "01-variables",
+  "id": "01-values",
   "title": "A variable holds a value",
   "objective": "Show that a variable holds the value you last put in it.",
   "concepts": [
@@ -28,5 +28,6 @@
   "expected_wall_ms": 3000,
   "hints": [
     "hints.md"
-  ]
+  ],
+  "requires": []
 }

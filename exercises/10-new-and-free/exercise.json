@@ -1,0 +1,37 @@
+{
+  "id": "10-new-and-free",
+  "title": "An object that exists, and then does not",
+  "objective": "Show that `new` creates an object with its own identity and `free` ends it.",
+  "concepts": [
+    "allocation",
+    "free",
+    "pointer",
+    "ownership"
+  ],
+  "difficulty": 3,
+  "requires": [
+    "05-pointers"
+  ],
+  "entry": "start.odin",
+  "assertions": [
+    {
+      "id": "A1",
+      "at": "any",
+      "expr": "type_of(\"node\") == \"struct main::Node\""
+    },
+    {
+      "id": "A2",
+      "at": "any",
+      "expr": "value_of(\"node.value\") == \"7\""
+    },
+    {
+      "id": "A3",
+      "at": "final",
+      "expr": "output_equals(\"7\\n\")"
+    }
+  ],
+  "hints": [
+    "hints.md"
+  ],
+  "expected_wall_ms": 3000
+}

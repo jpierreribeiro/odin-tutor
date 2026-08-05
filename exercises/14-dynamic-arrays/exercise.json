@@ -1,0 +1,31 @@
+{
+  "id": "14-dynamic-arrays",
+  "title": "Length and capacity are two numbers",
+  "objective": "Show that a dynamic array can hold room it is not using.",
+  "concepts": [
+    "dynamic-array",
+    "array",
+    "length"
+  ],
+  "difficulty": 2,
+  "requires": [
+    "12-slices"
+  ],
+  "entry": "start.odin",
+  "assertions": [
+    {
+      "id": "A1",
+      "at": "any",
+      "expr": "length_of(\"numbers\") == 3"
+    },
+    {
+      "id": "A2",
+      "at": "final",
+      "expr": "output_contains(\"3\")"
+    }
+  ],
+  "hints": [
+    "hints.md"
+  ],
+  "expected_wall_ms": 3000
+}

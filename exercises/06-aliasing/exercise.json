@@ -1,0 +1,31 @@
+{
+  "id": "06-aliasing",
+  "title": "Two names for one object",
+  "objective": "Show that two variables can name the same object, so a change through one is visible through the other.",
+  "concepts": [
+    "pointer",
+    "aliasing",
+    "mutation"
+  ],
+  "difficulty": 2,
+  "requires": [
+    "05-pointers"
+  ],
+  "entry": "start.odin",
+  "assertions": [
+    {
+      "id": "A1",
+      "at": "any",
+      "expr": "alias(\"a\", \"b\")"
+    },
+    {
+      "id": "A2",
+      "at": "final",
+      "expr": "output_equals(\"42 42\\n\")"
+    }
+  ],
+  "hints": [
+    "hints.md"
+  ],
+  "expected_wall_ms": 3000
+}

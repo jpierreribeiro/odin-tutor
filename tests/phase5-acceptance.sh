@@ -35,7 +35,7 @@ echo "--- building the tool"
 odin build src/tutor -out:"$work/odin-tutor" >/dev/null
 tool="$work/odin-tutor"
 
-exercises="01-variables 02-slices 03-slices-share-storage"
+exercises=$(ls exercises | grep -v README)
 
 # ---------------------------------------------------------------------------
 echo
@@ -76,7 +76,7 @@ done
 # The wrong sub-slice solution prints exactly what the reference prints. Every
 # test that compares output accepts it. Only the memory assertion separates
 # them.
-report="$work/03-slices-share-storage.wrong"
+report="$work/13-sub-slices.wrong"
 if grep -q '^  pass  *A4' "$report" && grep -q '^  FAIL  *A1' "$report"; then
 	ok "the wrong sub-slice passes the OUTPUT assertion and fails the SHARING one"
 else
@@ -220,7 +220,7 @@ rm -rf "$XDG_STATE_HOME"
 
 # 1. A bare invocation is the student's command, not a usage error.
 if "$tool" list > "$work/list.txt" 2>&1; then
-	if grep -q '0 of 3 finished' "$work/list.txt"; then
+	if grep -q 'of 9 finished' "$work/list.txt"; then
 		ok "list shows every exercise with done and not-done"
 	else
 		bad "list did not report progress" "$(head -4 "$work/list.txt")"
@@ -234,21 +234,21 @@ python3 - "$XDG_STATE_HOME" <<'SCRIPT'
 import json, os, pathlib, sys
 root = pathlib.Path(sys.argv[1]) / "odin-tutor"
 root.mkdir(parents=True, exist_ok=True)
-(root / "progress.json").write_text(json.dumps({"completed": ["01-variables"]}))
+(root / "progress.json").write_text(json.dumps({"completed": ["01-values"]}))
 SCRIPT
-if "$tool" list 2>&1 | grep -q 'done  01-variables'; then
+if "$tool" list 2>&1 | grep -q 'done  01-values'; then
 	ok "a finished exercise is remembered across runs"
 else
 	bad "progress was not read back"
 fi
-if "$tool" list 2>&1 | grep -q '1 of 3 finished'; then
+if "$tool" list 2>&1 | grep -q '1 of 9 finished'; then
 	ok "and the count reflects it"
 else
 	bad "the finished count did not move"
 fi
 
 # 3. The next exercise is chosen FOR the student.
-if "$tool" hint 2>&1 | grep -q 'slice is a pointer and a length'; then
+if "$tool" hint 2>&1 | grep -q "takes the address of a counter"; then
 	ok "hint answers for the exercise the student is on, unnamed"
 else
 	bad "hint did not pick up the current exercise" \

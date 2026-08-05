@@ -1,5 +1,5 @@
 {
-  "id": "03-slices-share-storage",
+  "id": "13-sub-slices",
   "title": "Two windows on one array",
   "objective": "Show that a sub-slice shares memory with the slice it came from, rather than copying it.",
   "concepts": [
@@ -9,8 +9,8 @@
   ],
   "difficulty": 2,
   "requires": [
-    "01-variables",
-    "02-slices"
+    "01-values",
+    "12-slices"
   ],
   "entry": "start.odin",
   "assertions": [

@@ -428,9 +428,19 @@ frame panel incomplete.
 > `list`, `hint` — and the acceptance script gained a section for it so the same
 > gap cannot reopen silently.
 >
-> Still short of [CURRICULUM.md](CURRICULUM.md): three exercises exist where it
-> describes a sequence. That is content, not mechanism, and it is written down
-> rather than implied.
+> **Nine exercises**, on the curriculum's own ids: `01-values`, `05-pointers`,
+> `06-aliasing`, `08-recursion`, `10-new-and-free`, `12-slices`,
+> `13-sub-slices`, `14-dynamic-arrays`, `16-utf8`. Every one accepts its
+> reference solution, rejects a plausible wrong one, and has a hint.
+>
+> Three of them accepted their wrong solution when first written, and the
+> acceptance script caught all three. `08-recursion` needed the loop and the
+> recursion to print the SAME number, so that only a frame returning the base
+> case separates them. `16-utf8` needed the text printed beside the length, or
+> ten ASCII letters reach ten bytes and teach nothing.
+>
+> Still short of [CURRICULUM.md](CURRICULUM.md): it names about twenty, and it
+> marks several of them marginal for this tool. What is missing is content.
 
 **Goal:** the tool becomes a course rather than a viewer.
 

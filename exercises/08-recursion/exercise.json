@@ -1,0 +1,32 @@
+{
+  "id": "08-recursion",
+  "title": "A call that calls itself",
+  "objective": "Show that each invocation has its own frame, with its own argument and its own return value.",
+  "concepts": [
+    "procedure",
+    "recursion",
+    "frame",
+    "return"
+  ],
+  "difficulty": 3,
+  "requires": [
+    "01-values"
+  ],
+  "entry": "start.odin",
+  "assertions": [
+    {
+      "id": "A1",
+      "at": "any",
+      "expr": "returns(\"countdown\", \"0\")"
+    },
+    {
+      "id": "A2",
+      "at": "final",
+      "expr": "output_equals(\"4\\n\")"
+    }
+  ],
+  "hints": [
+    "hints.md"
+  ],
+  "expected_wall_ms": 3000
+}

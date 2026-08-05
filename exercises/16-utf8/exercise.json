@@ -1,0 +1,30 @@
+{
+  "id": "16-utf8",
+  "title": "Characters are not bytes",
+  "objective": "Show that a string's length is measured in bytes, not in characters.",
+  "concepts": [
+    "string",
+    "conversion"
+  ],
+  "difficulty": 2,
+  "requires": [
+    "01-values"
+  ],
+  "entry": "start.odin",
+  "assertions": [
+    {
+      "id": "A1",
+      "at": "any",
+      "expr": "length_of(\"text\") == 10"
+    },
+    {
+      "id": "A2",
+      "at": "final",
+      "expr": "output_equals(\"naïve ✓ 10\\n\")"
+    }
+  ],
+  "hints": [
+    "hints.md"
+  ],
+  "expected_wall_ms": 3000
+}

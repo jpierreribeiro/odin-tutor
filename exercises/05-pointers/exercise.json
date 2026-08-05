@@ -1,0 +1,31 @@
+{
+  "id": "05-pointers",
+  "title": "A pointer is a reference, not a copy",
+  "objective": "Show that writing through a pointer changes the thing it points at.",
+  "concepts": [
+    "pointer",
+    "reference",
+    "mutation"
+  ],
+  "difficulty": 2,
+  "requires": [
+    "01-values"
+  ],
+  "entry": "start.odin",
+  "assertions": [
+    {
+      "id": "A1",
+      "at": "any",
+      "expr": "type_of(\"p\") == \"struct main::Counter\""
+    },
+    {
+      "id": "A2",
+      "at": "final",
+      "expr": "output_equals(\"9\\n\")"
+    }
+  ],
+  "hints": [
+    "hints.md"
+  ],
+  "expected_wall_ms": 3000
+}
