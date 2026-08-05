@@ -1,0 +1,16 @@
+{
+  "id": "03-slices-share-storage",
+  "title": "Two windows on one array",
+  "objective": "Show that a sub-slice shares memory with the slice it came from, rather than copying it.",
+  "concepts": ["slice", "shared-storage", "aliasing"],
+  "difficulty": 2,
+  "requires": ["01-variables", "02-slices"],
+  "entry": "start.odin",
+  "assertions": [
+    { "id": "A1", "at": "any", "expr": "shares_storage(\"todos\", \"parte\")" },
+    { "id": "A2", "at": "any", "expr": "not_alias(\"todos\", \"parte\")" },
+    { "id": "A3", "at": "any", "expr": "length_of(\"parte\") == 2" },
+    { "id": "A4", "at": "final", "expr": "output_equals(\"3 2\\n\")" }
+  ],
+  "expected_wall_ms": 3000
+}

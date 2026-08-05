@@ -1,0 +1,15 @@
+{
+  "id": "02-slices",
+  "title": "A slice knows its own length",
+  "objective": "Show that a slice carries a length beside its data, and that the picture reads it.",
+  "concepts": ["slice", "length"],
+  "difficulty": 1,
+  "requires": ["01-variables"],
+  "entry": "start.odin",
+  "assertions": [
+    { "id": "A1", "at": "any", "expr": "length_of(\"marks\") == 3" },
+    { "id": "A2", "at": "any", "expr": "element_count(\"marks\") == 3" },
+    { "id": "A3", "at": "final", "expr": "output_contains(\"[7, 8, 9]\")" }
+  ],
+  "expected_wall_ms": 3000
+}

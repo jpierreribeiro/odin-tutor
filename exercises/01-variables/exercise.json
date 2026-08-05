@@ -1,0 +1,14 @@
+{
+  "id": "01-variables",
+  "title": "A variable holds a value",
+  "objective": "Show that a variable holds the value you last put in it.",
+  "concepts": ["variable", "scalar"],
+  "difficulty": 1,
+  "entry": "start.odin",
+  "assertions": [
+    { "id": "A1", "at": "any", "expr": "value_of(\"total\") == \"7\"" },
+    { "id": "A2", "at": "any", "expr": "state_of(\"total\") == \"valid\"" },
+    { "id": "A3", "at": "final", "expr": "output_equals(\"7\\n\")" }
+  ],
+  "expected_wall_ms": 3000
+}

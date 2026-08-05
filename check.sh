@@ -9,13 +9,13 @@ set -e
 export PATH="$ODIN_ROOT:$PATH"
 
 echo "--- vet"
-for pkg in obs model render preflight toolchain; do
+for pkg in obs model render preflight toolchain exercise; do
 	odin check "src/$pkg" -no-entry-point -vet -strict-style
 done
 odin check src/tutor -vet -strict-style
 
 echo "--- tests"
-for pkg in obs model render preflight toolchain; do
+for pkg in obs model render preflight toolchain exercise; do
 	odin test "src/$pkg"
 done
 

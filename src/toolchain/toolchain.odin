@@ -270,6 +270,11 @@ Trace_Request :: struct {
 	executable:        string,
 	source_path:       string,
 	observations_path: string,
+	// stdout_path is where the TARGET's output goes. The student's output and
+	// the trace are two streams from one run and neither may be lost, so the
+	// debugger redirects the inferior rather than letting both write to one
+	// terminal.
+	stdout_path:       string,
 	adapter_path:      string,
 	versions:          Versions,
 }
@@ -297,6 +302,7 @@ trace :: proc(request: Trace_Request, allocator := context.allocator) -> (diagno
 	environment := []string{
 		strings.concatenate({"TUTOR_SOURCE=", request.source_path}, context.temp_allocator),
 		strings.concatenate({"TUTOR_OUT=", request.observations_path}, context.temp_allocator),
+		strings.concatenate({"TUTOR_STDOUT=", request.stdout_path}, context.temp_allocator),
 		strings.concatenate({"TUTOR_ODIN_VERSION=", request.versions.odin}, context.temp_allocator),
 		strings.concatenate({"PATH=", os.get_env("PATH", context.temp_allocator)}, context.temp_allocator),
 		strings.concatenate({"HOME=", os.get_env("HOME", context.temp_allocator)}, context.temp_allocator),

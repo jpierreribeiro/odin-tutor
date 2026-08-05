@@ -10,7 +10,7 @@ stack, the variables, and the object graph at each step.
 
 ## Status
 
-**Phases 0 through 3 complete.** One command takes a `.odin` file to a rendered
+**Version 1 is complete: Phases 0 through 5.** One command takes a `.odin` file to a rendered
 step, and the picture it draws is the memory model: identities that are never
 addresses, sub-slices shown as windows onto one buffer, pointers resolved to
 references, cycles that show their own identifier, and return values attributed
@@ -30,6 +30,8 @@ export ODIN_ROOT=/path/to/Odin        # core: imports fail without it
 ./tests/phase1-acceptance.sh          # is the phase done?
 ./tests/phase2-acceptance.sh
 ./tests/phase3-acceptance.sh
+./tests/phase4-acceptance.sh
+./tests/phase5-acceptance.sh
 
 ./odin-tutor trace fixtures/programs/sub-slice.odin trace.json
 ./odin-tutor render trace.json 4
@@ -55,8 +57,25 @@ version, drives gdb, records the observation stream beside the trace, and
 assembles it. The recorded stream replays to a byte-identical trace with gdb
 uninstalled, which is what makes every later phase testable in milliseconds.
 
-Not built yet: the interactive step player (Phase 4), the validator and the
-exercises (Phase 5).
+```sh
+odin-tutor play trace.json                        # step through it
+odin-tutor check exercises/03-slices-share-storage
+```
+
+The exercise that explains the whole project: its wrong solution prints `3 2`,
+exactly like the reference solution, and fails anyway.
+
+```
+  FAIL          A1    no step satisfied this      shares_storage("todos", "parte")
+  pass          A4                                output_equals("3 2\n")
+```
+
+Every test that compares printed output accepts that program. Only the picture
+separates a window onto an array from a copy of part of it.
+
+Two known gaps ship, both written down and both with tests: allocation identity
+after a free ([R-07](docs/RISKS.md)) and use-after-free detection
+([R-21](docs/RISKS.md#r-21)). Neither fabricates a picture.
 See [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 Read [`docs/PROJECT.md`](docs/PROJECT.md) first, then

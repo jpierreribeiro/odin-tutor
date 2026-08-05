@@ -354,6 +354,16 @@ return values that are usually right is not.
 
 ## Phase 4 — The interface
 
+> **Built 2026-08-05.** `odin-tutor play` steps through a trace. All five
+> acceptance criteria are checked by
+> [`tests/phase4-acceptance.sh`](../tests/phase4-acceptance.sh), 13 checks,
+> including terminal restoration driven through a real pty for both `q` and
+> SIGINT.
+>
+> Navigation measured at **0.011 ms at the 99th percentile** on a 2500-step
+> trace, against a 16 ms budget. `odin-tutor bench` records it, so the claim is
+> checkable rather than asserted (SPEC-PERF-032).
+
 **Goal:** the step player a student uses.
 
 **Inputs:** traces from Phase 3.
@@ -396,6 +406,16 @@ frame panel incomplete.
 ---
 
 ## Phase 5 — Exercises and the validator
+
+> **Built 2026-08-05.** `odin-tutor check <exercise>` builds, traces, and
+> reports every assertion under three verdicts. All four acceptance criteria are
+> checked by [`tests/phase5-acceptance.sh`](../tests/phase5-acceptance.sh),
+> 15 checks.
+>
+> The worked example works: `03-slices-share-storage`'s wrong solution **passes
+> the output assertion and fails the sharing one**. It prints `3 2`, exactly
+> like the reference. Every test that compares printed text accepts it, and only
+> the picture separates them.
 
 **Goal:** the tool becomes a course rather than a viewer.
 

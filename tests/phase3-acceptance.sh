@@ -171,7 +171,10 @@ fi
 # The renderer must NOT say the frame is empty. "Not created yet" and "there are
 # no variables" are different statements, and only one of them is true here.
 rendered=$("$tool" render "$work/prologue.json" 3)
-if printf '%s' "$rendered" | grep -q 'not created yet'; then
+# The form is TUI-SPEC §3's, not prose of our own: `- not yet` in ASCII and
+# `· not yet` with Unicode. The wording moved when the renderer was rewritten to
+# the spec's table in Phase 4; the fact being asserted did not.
+if printf '%s' "$rendered" | grep -q -- '- not yet'; then
 	ok "the render names the state instead of the frame being empty"
 else
 	bad "the render did not show a not-yet-active variable" "$rendered"

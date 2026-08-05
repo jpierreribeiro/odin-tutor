@@ -37,6 +37,11 @@ WALL_MS = int(os.environ.get("TUTOR_WALL_MS", 60_000))
 SOURCE = os.environ.get("TUTOR_SOURCE", "")
 OUT_PATH = os.environ.get("TUTOR_OUT", "observations.json")
 ENTRY = os.environ.get("TUTOR_ENTRY", "main::main")
+# Where the target's own output goes. The student's stdout and the trace are two
+# streams from one run, and neither may be lost. gdb redirects the inferior with
+# `run > path`, which is the only way to keep the target's writes apart from the
+# debugger's own on the same terminal.
+STDOUT_PATH = os.environ.get("TUTOR_STDOUT", "")
 
 VALID, NOT_YET_ACTIVE, UNREADABLE, UNKNOWN = 0, 1, 2, 3
 
@@ -419,6 +424,21 @@ class Expansion:
                 continue
 
 
+def output_so_far():
+    """Cumulative bytes the target has written, in BYTES.
+
+    Not characters. SPEC-SAFE-031 records a prior system that counted one and
+    limited the other, cut a document mid-way, and lost a whole trace rather
+    than truncating it. The unit is in the name for that reason.
+    """
+    if not STDOUT_PATH:
+        return 0
+    try:
+        return os.path.getsize(STDOUT_PATH)
+    except OSError:
+        return 0
+
+
 def sal_line(frame):
     try:
         sal = frame.find_sal()
@@ -638,6 +658,18 @@ class Run:
             pass
 
 
+def captured_output():
+    if not STDOUT_PATH:
+        return ""
+    try:
+        with open(STDOUT_PATH, "rb") as handle:
+            # Bounded like every other read. A program that prints without end
+            # must not turn the trace into its log file.
+            return handle.read(1 << 20).decode("utf-8", errors="replace")
+    except OSError:
+        return ""
+
+
 def emit(run, stdout_text, exit_code):
     stream = {
         "schema_version": SCHEMA_VERSION,
@@ -680,11 +712,14 @@ def main():
         # letting the program run to completion with an empty trace.
         run.termination = 5          # Debug_Info_Missing
         run.detail = "the entry procedure %s did not resolve" % ENTRY
-        emit(run, "", 0)
+        emit(run, captured_output(), 0)
         return
 
     gdb.execute("break %s" % ENTRY, to_string=True)
-    gdb.execute("run", to_string=True)
+    if STDOUT_PATH:
+        gdb.execute("run > %s" % STDOUT_PATH, to_string=True)
+    else:
+        gdb.execute("run", to_string=True)
 
     index = 0
     while index < BUDGETS["steps"]:
@@ -736,7 +771,7 @@ def main():
             "frames": frames,
             "objects": expansion.objects,
             "returned": run.pending_returns,
-            "stdout_len": 0,
+            "stdout_len": output_so_far(),
         }
         run.pending_returns = []
         if expansion.truncated:
@@ -752,7 +787,7 @@ def main():
     else:
         run.termination = 1          # Limit_Steps
 
-    emit(run, "", 0)
+    emit(run, captured_output(), 0)
 
 
 try:

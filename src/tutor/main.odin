@@ -12,6 +12,7 @@ import "core:strconv"
 import "core:time"
 import "core:path/filepath"
 import "core:strings"
+import tutor_exercise "../exercise"
 import tutor_model "../model"
 import tutor_obs "../obs"
 import tutor_preflight "../preflight"
@@ -41,6 +42,10 @@ USAGE :: `odin-tutor — see what your Odin program does to memory
       The same information as the interactive screen, as plain text.
       --unicode uses the same glyphs the screen does, and loses nothing
       without it.
+
+  odin-tutor check <exercise-dir> [--entry <file>] [--watch]
+      Build the exercise's entry file, trace it, and report every assertion.
+      --watch re-runs when the file changes.
 
   odin-tutor bench <trace.json>
       Measure navigation: how long materialising each step takes.
@@ -114,6 +119,32 @@ main :: proc() {
 			index = parsed
 		}
 		os.exit(cmd_render(args[1], index, style))
+	case "check":
+		if len(args) < 2 {
+			fmt.eprintln("check needs an exercise directory")
+			os.exit(2)
+		}
+		entry_override := ""
+		watch := false
+		i := 2
+		for i < len(args) {
+			switch args[i] {
+			case "--watch":
+				watch = true
+			case "--entry":
+				if i + 1 >= len(args) {
+					fmt.eprintln("--entry needs a file name")
+					os.exit(2)
+				}
+				i += 1
+				entry_override = args[i]
+			case:
+				fmt.eprintfln("unknown option: %s", args[i])
+				os.exit(2)
+			}
+			i += 1
+		}
+		os.exit(cmd_check(args[1], entry_override, watch))
 	case "bench":
 		if len(args) != 2 {
 			fmt.eprintln("bench needs a trace path")
@@ -213,6 +244,7 @@ cmd_trace :: proc(source_path, trace_path: string) -> int {
 	observations_path := strings.concatenate(
 		{trace_path, ".observations"}, context.temp_allocator,
 	)
+	stdout_path := strings.concatenate({trace_path, ".stdout"}, context.temp_allocator)
 	adapter_path := adapter_location(context.temp_allocator)
 
 	diagnostics, trace_failure := tutor_toolchain.trace(
@@ -220,6 +252,7 @@ cmd_trace :: proc(source_path, trace_path: string) -> int {
 			executable        = built.executable,
 			source_path       = source_path,
 			observations_path = observations_path,
+			stdout_path       = stdout_path,
 			adapter_path      = adapter_path,
 			versions          = versions,
 		},
@@ -363,6 +396,177 @@ cmd_play :: proc(trace_path: string, style: tutor_render.Style) -> int {
 	}
 	source := source_beside(trace, trace_path, context.temp_allocator)
 	return tutor_tui.run(trace, source, style)
+}
+
+// cmd_check builds an exercise's entry file, traces it, and reports every
+// assertion.
+//
+// The verdicts are THREE. `undetermined` blocks the pass and is never rendered
+// as the student's failure: missing evidence has causes that are not their
+// doing (SPEC-VAL-001, SPEC-VAL-003).
+cmd_check :: proc(directory, entry_override: string, watch: bool) -> int {
+	manifest_path, join_err := filepath.join(
+		{directory, "exercise.json"}, context.temp_allocator,
+	)
+	if join_err != nil {
+		fmt.eprintln("BAD_PATH: the exercise directory could not be read.")
+		return 1
+	}
+	data, read_err := os.read_entire_file(manifest_path, context.temp_allocator)
+	if read_err != nil {
+		fmt.eprintfln("EXERCISE_UNREADABLE: could not read %s", manifest_path)
+		return 1
+	}
+	exercise, load_err := tutor_exercise.load(data, context.temp_allocator)
+	switch load_err {
+	case .None:
+	case .Malformed_Json:
+		fmt.eprintln("EXERCISE_MALFORMED: exercise.json is not valid JSON.")
+		return 1
+	case .No_Entry:
+		fmt.eprintln("EXERCISE_INCOMPLETE: the exercise names no entry file.")
+		return 1
+	case .No_Assertions:
+		// An exercise with no assertions accepts every solution, including the
+		// wrong ones. SPEC-EX-052 requires the opposite.
+		fmt.eprintln("EXERCISE_INCOMPLETE: the exercise has no assertions, so it would accept anything.")
+		return 1
+	}
+
+	entry := entry_override != "" ? entry_override : exercise.entry
+	entry_path, entry_err := filepath.join({directory, entry}, context.temp_allocator)
+	if entry_err != nil {
+		fmt.eprintln("BAD_PATH: the entry file could not be resolved.")
+		return 1
+	}
+
+	if !watch {
+		return run_check(exercise, entry_path)
+	}
+
+	// Watch mode: re-run when the file changes. Polling on the modification
+	// time, because the alternative is a per-platform notification API and a
+	// dependency, which Rule 10 would make us justify for every platform.
+	last := modified_at(entry_path)
+	run_check(exercise, entry_path)
+	fmt.println("\nwatching", entry_path, "— press Ctrl-C to stop")
+	for {
+		time.sleep(300 * time.Millisecond)
+		now := modified_at(entry_path)
+		if now == last {
+			continue
+		}
+		last = now
+		fmt.println()
+		run_check(exercise, entry_path)
+		fmt.println("\nwatching", entry_path, "— press Ctrl-C to stop")
+	}
+}
+
+modified_at :: proc(path: string) -> i64 {
+	info, err := os.stat(path, context.temp_allocator)
+	if err != nil {
+		return 0
+	}
+	return i64(info.modification_time._nsec)
+}
+
+run_check :: proc(exercise: tutor_exercise.Exercise, entry_path: string) -> int {
+	report, versions := examine(context.temp_allocator)
+	if report.failure != .None {
+		fmt.eprintln(tutor_preflight.explain(report.failure, context.temp_allocator))
+		return 1
+	}
+
+	built, build_failure := tutor_toolchain.build(entry_path, versions, context.temp_allocator)
+	if build_failure != .None {
+		// The compiler's own message, unchanged. It names the line, which is the
+		// part the student needs, and rewriting it would drop that.
+		if built.diagnostics != "" {
+			fmt.eprint(built.diagnostics)
+		}
+		fmt.eprintln(tutor_toolchain.explain(build_failure, context.temp_allocator))
+		return 1
+	}
+
+	work := strings.concatenate({built.executable, ".check"}, context.temp_allocator)
+	_, trace_failure := tutor_toolchain.trace(
+		tutor_toolchain.Trace_Request{
+			executable        = built.executable,
+			source_path       = entry_path,
+			observations_path = strings.concatenate({work, ".observations"}, context.temp_allocator),
+			stdout_path       = strings.concatenate({work, ".stdout"}, context.temp_allocator),
+			adapter_path      = adapter_location(context.temp_allocator),
+			versions          = versions,
+		},
+		context.temp_allocator,
+	)
+	if trace_failure != .None {
+		fmt.eprintln(tutor_toolchain.explain(trace_failure, context.temp_allocator))
+		return 1
+	}
+
+	observations, obs_err := os.read_entire_file(
+		strings.concatenate({work, ".observations"}, context.temp_allocator),
+		context.temp_allocator,
+	)
+	if obs_err != nil {
+		fmt.eprintln("OBSERVATIONS_MISSING: the adapter wrote nothing.")
+		return 1
+	}
+	stream, decode_err := tutor_obs.decode(observations)
+	if decode_err != .None {
+		fmt.eprintln("OBSERVATION_MALFORMED: the adapter's output is not valid JSON.")
+		return 1
+	}
+
+	assembly: tutor_model.Assembly
+	if tutor_model.assembly_init(&assembly) != nil {
+		fmt.eprintln("OUT_OF_MEMORY: could not reserve the assembly arena.")
+		return 1
+	}
+	defer tutor_model.assembly_destroy(&assembly)
+
+	trace, build_err := tutor_model.assemble(&assembly, stream)
+	if build_err != .None {
+		fmt.eprintln("BUDGET_DISAGREEMENT: the adapter reports different limits from this build.")
+		return 1
+	}
+
+	results := tutor_exercise.evaluate(exercise, trace, context.temp_allocator)
+
+	fmt.printfln("%s — %s", exercise.id, exercise.title)
+	fmt.println(exercise.objective)
+	fmt.println()
+	undetermined := 0
+	for r in results {
+		switch r.verdict {
+		case .Pass:
+			fmt.printfln("  pass          %-4s", r.id)
+		case .Fail:
+			fmt.printfln("  FAIL          %-4s  %s", r.id, r.reason)
+		case .Undetermined:
+			undetermined += 1
+			fmt.printfln("  undetermined  %-4s  %s", r.id, r.reason)
+		}
+	}
+	fmt.println()
+
+	if tutor_exercise.passed(results) {
+		fmt.println("Done. Every assertion passed.")
+		return 0
+	}
+	if undetermined > 0 {
+		// Never rendered as a failure of the solution. The student is told what
+		// to do about it, and it is not "change your logic".
+		fmt.println(
+			"Not done. Some assertions could not be decided — that is a limit of the tool, " +
+			"not a mistake in your program. Shortening the program usually resolves it.",
+		)
+	} else {
+		fmt.println("Not done yet.")
+	}
+	return 1
 }
 
 // cmd_bench measures what navigation actually costs.
