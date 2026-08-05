@@ -1,42 +1,63 @@
 package main
-import "core:fmt"
-import "core:mem"
 
-No :: struct { valor: int, prox: ^No }
+import "core:fmt"
+
+Node :: struct {
+	value: int,
+	next:  ^Node,
+}
 
 main :: proc() {
 	// two-empty-slices
-	vazia1: []int
-	vazia2: []int
+	empty1: []int
+	empty2: []int
 
 	// two-equal-lists
-	l1 := []int{1, 2, 3}
-	l2 := []int{1, 2, 3}
+	list1 := []int{1, 2, 3}
+	list2 := []int{1, 2, 3}
 
 	// cycle
-	c := new(No); c.valor = 7; c.prox = c
+	cycle_node := new(Node)
+	cycle_node.value = 7
+	cycle_node.next = cycle_node
 
 	// dynamic array + map
-	din: [dynamic]int
-	append(&din, 10); append(&din, 20)
-	m := make(map[string]int); m["a"] = 1
+	numbers: [dynamic]int
+	append(&numbers, 10)
+	append(&numbers, 20)
+	table := make(map[string]int)
+	table["a"] = 1
 
 	// dangling
-	morto := new(int); morto^ = 5
-	free(morto)
+	dead := new(int)
+	dead^ = 5
+	free(dead)
 
 	// corrupt length
-	corrompida := l1
-	(cast(^int)(uintptr(&corrompida) + size_of(rawptr)))^ = 4_000_000_000
+	corrupted := list1
+	(cast(^int)(uintptr(&corrupted) + size_of(rawptr)))^ = 4_000_000_000
 
 	// free-then-allocate
-	p1 := new(int); p1^ = 1
-	free(p1)
-	p2 := new(int); p2^ = 2
+	first := new(int)
+	first^ = 1
+	free(first)
+	second := new(int)
+	second^ = 2
 
 	// utf8
-	txt := "coração ✓"
+	text := "naïve ✓"
 
-	fmt.println(len(vazia1), len(vazia2), l1, l2, c.valor, din[:], len(m), morto, len(txt), p2^)
-	_ = corrompida
+	fmt.println(
+		len(empty1),
+		len(empty2),
+		list1,
+		list2,
+		cycle_node.value,
+		numbers[:],
+		len(table),
+		dead,
+		len(text),
+		second^,
+	)
+	_ = corrupted
 }
