@@ -480,6 +480,14 @@ the one known incorrectness in version 1.
 It splits in two, and the cheap half may be enough.
 
 ### Phase 6a — Free events only
+> **Built 2026-08-05.** Ten checks in
+> [`tests/phase6-acceptance.sh`](../tests/phase6-acceptance.sh).
+> `free-then-allocate` yields two identities, [R-07](RISKS.md#r-07) is closed,
+> and REQ-MEM-003 is fully met.
+>
+> The obvious symbol was wrong: `runtime::heap_free` reports an address eight
+> bytes below the object's. `runtime::heap_allocator_proc` with `mode == Free`
+> carries the student's pointer.
 Break on the free path alone. A free event is positive evidence that a storage
 died, which is exactly what [ADR-011](decisions/ADR-011-absence-is-not-evidence.md)
 says the model lacks. Frees are far rarer than allocations in a teaching

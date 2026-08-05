@@ -354,6 +354,13 @@
         "expansion_truncated": {
           "type": "boolean",
           "description": "An expansion budget stopped the reading. The difference between 'the graph ends here' and 'we stopped looking'. See SPEC-SAFE-030."
+        },
+        "freed": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "description": "Addresses returned to the allocator before this step. Positive evidence that a storage died, which is the one thing the absence rule cannot supply. See ROADMAP Phase 6a."
         }
       }
     }

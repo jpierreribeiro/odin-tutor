@@ -150,6 +150,30 @@ advance_epoch_on_absence :: proc(
 	return true
 }
 
+// advance_epoch_on_free records a death the PROGRAM reported.
+//
+// This is the one piece of positive evidence the identity model can have, and
+// it needs no guard. ADR-011's whole argument is that ABSENCE is unsafe
+// evidence, because the reachable set is a property of our traversal and a
+// budget can hide a living object. A free event is not absence. The program
+// handed the storage back.
+//
+// Every type at the address advances, because the bytes are dead whatever they
+// were. The next allocation there gets a new identity, which is exactly the case
+// SPEC-MEM-042 recorded as a known incorrectness in version 1.
+advance_epoch_on_free :: proc(r: ^Registry, address: u64) {
+	if address == 0 {
+		return
+	}
+	if type_name, found := r.last_type[address]; found {
+		r.epochs[Epoch_Key{address, type_name}] += 1
+	}
+	// Also forget the address, so a later absence is not ALSO counted. One
+	// death, one epoch: counting it twice would split a live object in half.
+	delete_key(&r.last_type, address)
+	delete_key(&r.last_seen, Epoch_Key{address, ""})
+}
+
 // advance_epoch_on_type_change implements SPEC-MEM-041 rule 1. A different
 // type at one address is positive evidence: the bytes there are a different
 // thing now.

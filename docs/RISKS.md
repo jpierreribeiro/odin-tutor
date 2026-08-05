@@ -590,6 +590,34 @@ source line, which is slower and is bounded by
 ---
 
 <a id="r-20"></a>
+### R-07 — Allocation identity after a free
+**Class:** HIGH · **Status: CLOSED by Phase 6a, 2026-08-05**
+
+The adapter now breaks on the allocator's entry point and records what the
+program handed back. A free event is **positive** evidence that a storage died —
+the one kind [ADR-011](decisions/ADR-011-absence-is-not-evidence.md) says the
+absence rule can never supply, because a budget can fake absence and cannot fake
+a free.
+
+`free-then-allocate` yields two identities. The version 1 test that asserted the
+incorrect behaviour was replaced rather than deleted, and its successor asserts
+the closed behaviour ([SPEC-TEST-021](TEST-STRATEGY.md#spec-test-021)).
+
+**The symbol matters, and the obvious one is wrong.** `runtime::heap_free`
+resolves and exposes a `ptr`, and that pointer is **eight bytes below** the
+address the object lives at — it is the allocator's own base pointer. Matching it
+never matches; "correcting" it by a guessed offset risks the opposite failure,
+killing the identity of an object that is still alive.
+`runtime::heap_allocator_proc` carries the student's pointer in `old_memory` when
+`mode` is `Free`, and that address is exactly where the object lives.
+
+**What is still true.** Without a free event the model must not invent a death,
+so the absence rule and its guard remain. A toolchain whose allocator entry point
+does not resolve keeps the version 1 behaviour rather than failing, and that case
+still has a test.
+
+---
+
 ### R-20 — Map entries are not readable through the type
 **Class:** HIGH · **Status: LANDED 2026-08-05, DECIDED by [ADR-014](decisions/ADR-014-maps-are-counted-not-walked.md)**
 

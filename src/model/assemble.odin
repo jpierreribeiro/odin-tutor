@@ -248,6 +248,13 @@ build_step :: proc(
 	// resolved. Minting as we go would leave the first object's self-reference
 	// unresolvable, and "unresolvable" would render as a pointer into nothing —
 	// which is how a cycle gets drawn as a dead end.
+	// A death the program reported, before any identity is minted for this step.
+	// Positive evidence, and it needs no guard: ADR-011's caution is about
+	// ABSENCE, and this is not absence.
+	for address in record.freed {
+		advance_epoch_on_free(&a.registry, address)
+	}
+
 	discovered := make(map[u64]Id, allocator)
 	for object in record.objects {
 		if object.address == 0 {

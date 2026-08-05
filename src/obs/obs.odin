@@ -119,6 +119,10 @@ Record :: struct {
 	// See SPEC-SAFE-030.
 	expansion_truncated: bool `json:"expansion_truncated,omitempty"`,
 	returned:  []Returned   `json:"returned,omitempty"`,
+	// freed are the addresses the program returned to the allocator before this
+	// step. POSITIVE evidence that a storage died — the only kind the tool has.
+	// See ROADMAP Phase 6a, ADR-011.
+	freed:     []u64        `json:"freed,omitempty"`,
 	// stdout_len is the cumulative byte count of the target's output at this
 	// stop. Bytes, not characters: the unit is in the name on purpose.
 	// See SPEC-SAFE-031.

@@ -636,20 +636,24 @@ an_unfollowed_pointer_refers_to_nothing :: proc(t: ^testing.T) {
 }
 
 @(test)
-free_then_allocate_reuses_the_identity_which_is_WRONG :: proc(t: ^testing.T) {
-	// ROADMAP Phase 2, acceptance 7. SPEC-TEST-021.
+free_then_allocate_without_a_free_event_still_reuses_the_identity :: proc(t: ^testing.T) {
+	// REPLACED BY PHASE 6a, 2026-08-05. SPEC-TEST-021 required that this be
+	// replaced rather than quietly deleted, so here is what changed and why.
 	//
-	// This test asserts behaviour that is INCORRECT by REQ-MEM-003, on purpose.
+	// It used to be named `..._which_is_WRONG` and it asserted a version 1
+	// incorrectness: an object freed and an object allocated at the same address
+	// were indistinguishable, so the second inherited the first's identity.
 	//
-	// Version 1 has no allocation events, so it cannot tell reuse from
-	// continuity. An object freed and an object allocated at the same address
-	// with the same type are indistinguishable to a reader of memory, and the
-	// second inherits the first's identity. The student sees one object that
-	// changed value, where two objects lived and died.
+	// Phase 6a gave the model positive evidence — the adapter records what the
+	// program handed back to the allocator — and the companion test below shows
+	// two identities for the two objects.
 	//
-	// A known gap with a test is engineering. A known gap without one is a
-	// rumour. When Phase 6 closes this by observing the allocator, this test
-	// FAILS LOUDLY and is replaced rather than quietly deleted.
+	// This test survives because the stream here carries NO free event, and that
+	// case is still real: a toolchain whose allocator entry point does not
+	// resolve, or an allocator the adapter does not watch. Without evidence of
+	// death the model must not invent one, so the identity is still reused. What
+	// changed is that this is now a statement about MISSING EVIDENCE rather than
+	// about a limit of the model.
 	a: Assembly
 	assert(assembly_init(&a) == nil)
 	defer assembly_destroy(&a)
@@ -694,8 +698,53 @@ free_then_allocate_reuses_the_identity_which_is_WRONG :: proc(t: ^testing.T) {
 
 	testing.expect(t, first != NO_ID, "both steps refer to an object")
 	testing.expect_value(t, first, second)
-	// ^ THE WRONG ANSWER. Two objects, one identity. When this line starts
-	//   failing, REQ-MEM-003 has been met and TRACEABILITY.md must say so.
+}
+
+@(test)
+a_recorded_free_gives_the_next_allocation_a_new_identity :: proc(t: ^testing.T) {
+	// PHASE 6a, and the close of REQ-MEM-003.
+	//
+	// The same shape as the test above with ONE difference: the program told us
+	// the storage died. That is positive evidence, and it needs no guard —
+	// ADR-011's caution is about ABSENCE, which a budget can fake. A free event
+	// cannot be faked by a budget.
+	a: Assembly
+	assert(assembly_init(&a) == nil)
+	defer assembly_destroy(&a)
+
+	REUSED :: u64(0x5000)
+	members_first := []tutor_obs.Variable {
+		{name = "value", value = {state = .Valid, kind = .Scalar, type_name = "int", text = "1"}},
+	}
+	members_second := []tutor_obs.Variable {
+		{name = "value", value = {state = .Valid, kind = .Scalar, type_name = "int", text = "2"}},
+	}
+	object_first := tutor_obs.Value {
+		state = .Valid, kind = .Struct, type_name = "main::Node", address = REUSED,
+		members = members_first,
+	}
+	object_second := tutor_obs.Value {
+		state = .Valid, kind = .Struct, type_name = "main::Node", address = REUSED,
+		members = members_second,
+	}
+	pointer := tutor_obs.Value {
+		state = .Valid, kind = .Pointer, type_name = "^Node", data = REUSED, address = 0xA,
+	}
+	vars := []tutor_obs.Variable{{name = "p", value = pointer}}
+
+	trace, _ := assemble(&a, stream_of({
+		{index = 0, line = 1, frames = {one_frame(vars)},
+		 objects = []tutor_obs.Discovered{{address = REUSED, value = object_first}}},
+		// The step that carries the death.
+		{index = 1, line = 2, frames = {one_frame(vars)},
+		 objects = []tutor_obs.Discovered{{address = REUSED, value = object_second}},
+		 freed = []u64{REUSED}},
+	}))
+
+	first := trace.steps[0].frames[0].slots[0].refers_to
+	second := trace.steps[1].frames[0].slots[0].refers_to
+	testing.expect(t, first != NO_ID && second != NO_ID, "both steps refer to an object")
+	testing.expect(t, first != second, "two objects lived at one address, so there are two identities")
 }
 
 @(test)

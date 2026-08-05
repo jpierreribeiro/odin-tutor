@@ -622,6 +622,54 @@ class ReturnWatch(gdb.FinishBreakpoint):
         return (self.key[0], self.key[1], self.procedure)
 
 
+class FreeWatch(gdb.Breakpoint):
+    """Records that a storage died. PHASE 6a.
+
+    This is the only POSITIVE evidence of death the tool can have. Without it
+    the model infers death from absence, and ADR-011 spends a page on why that
+    inference is unsafe: a budget can hide a living object, so absence is
+    guarded and the guard costs real cases.
+
+    A free event needs no guard. The program said so.
+
+    THE SYMBOL MATTERS, and the obvious one is wrong.
+
+    Measured 2026-08-05. `runtime::heap_free` resolves and exposes a `ptr`
+    argument, and that pointer is EIGHT BYTES BELOW the address the object
+    lives at — it is the allocator's own base pointer, not the one the student
+    holds. Matching it against a known object address never matches, and
+    "correcting" it by a guessed offset risks the opposite failure: killing the
+    identity of an object that is still alive.
+
+    `runtime::heap_allocator_proc` is the entry point that carries the
+    student's pointer. It takes a `mode` and an `old_memory`, and on
+    `mode == Free` that address is exactly where the object lives.
+
+    libc `free` also resolves, and is also 8 bytes off, and is additionally
+    called by the loader and by the runtime for their own bookkeeping — it
+    would report deaths of storage the student never had.
+    """
+
+    def __init__(self, run, symbol):
+        super().__init__(symbol, internal=True)
+        self.run = run
+
+    def stop(self):
+        try:
+            frame = gdb.selected_frame()
+            if not str(frame.read_var("mode")).startswith("Free"):
+                return False
+            pointer = int(frame.read_var("old_memory"))
+            if pointer != 0:
+                self.run.pending_frees.append(pointer)
+        except Exception:  # noqa: BLE001
+            # A free we could not read is not a free we may invent. Silence
+            # here costs the epoch nothing: the model falls back to the
+            # absence rule, which is where it was before Phase 6.
+            pass
+        return False
+
+
 class Run:
     def __init__(self):
         self.records = []
@@ -643,6 +691,9 @@ class Run:
         # The watches themselves. Held so Python does not collect them while gdb
         # still owns the breakpoint.
         self.watches = {}
+        # Storages freed since the last record. Attached to the step at which
+        # the death became visible, like return values.
+        self.pending_frees = []
 
     def on_new_thread(self, event):
         # Detection is by event, not by counting.
@@ -715,6 +766,17 @@ def main():
         emit(run, captured_output(), 0)
         return
 
+    # Phase 6a: free events only. Frees are far rarer than allocations in a
+    # teaching program, so the cost in debugger stops is a fraction of watching
+    # every allocation - and a free is the event the identity model actually
+    # lacks (ROADMAP Phase 6a).
+    try:
+        FreeWatch(run, "runtime::heap_allocator_proc")
+    except Exception:  # noqa: BLE001
+        # A toolchain without that symbol keeps the version 1 behaviour rather
+        # than failing. The absence rule still works; it is just weaker.
+        pass
+
     gdb.execute("break %s" % ENTRY, to_string=True)
     if STDOUT_PATH:
         gdb.execute("run > %s" % STDOUT_PATH, to_string=True)
@@ -771,9 +833,11 @@ def main():
             "frames": frames,
             "objects": expansion.objects,
             "returned": run.pending_returns,
+            "freed": run.pending_frees,
             "stdout_len": output_so_far(),
         }
         run.pending_returns = []
+        run.pending_frees = []
         if expansion.truncated:
             # A budget stopped the reading. Saying so is the difference between
             # "the graph ends here" and "we stopped looking". SPEC-SAFE-030.
