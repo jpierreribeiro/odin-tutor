@@ -489,3 +489,72 @@ two_empty_views_are_two_objects :: proc(t: ^testing.T) {
 	testing.expect_value(t, len(slots), 2)
 	testing.expect(t, slots[0].refers_to != slots[1].refers_to, "two empty slices are two objects")
 }
+
+@(test)
+a_cycle_shows_the_objects_own_identity :: proc(t: ^testing.T) {
+	// THE LIE THIS PREVENTS: a cycle drawn as an endless chain of distinct
+	// objects, or an expansion that never terminates.
+	//
+	// The node points at itself. Its identity must already exist when its own
+	// field is resolved, which is why identities are minted for every
+	// discovered object BEFORE any of them is built. Minting as we go would
+	// leave the self-reference unresolvable, and unresolvable renders as a
+	// pointer into nothing — a cycle drawn as a dead end.
+	a: Assembly
+	assert(assembly_init(&a) == nil)
+	defer assembly_destroy(&a)
+
+	SELF :: u64(0x4000)
+	node := tutor_obs.Value {
+		state = .Valid, kind = .Struct, type_name = "main::Node", address = SELF,
+		members = []tutor_obs.Variable {
+			{name = "value", value = {state = .Valid, kind = .Scalar, type_name = "int", text = "7"}},
+			{name = "next", value = {state = .Valid, kind = .Pointer, type_name = "^Node", data = SELF}},
+		},
+	}
+	pointer := tutor_obs.Value {
+		state = .Valid, kind = .Pointer, type_name = "^Node", data = SELF, address = 0xA,
+	}
+	vars := []tutor_obs.Variable{{name = "node", value = pointer}}
+	record := tutor_obs.Record {
+		index = 0, line = 1,
+		frames = {one_frame(vars)},
+		objects = []tutor_obs.Discovered{{address = SELF, value = node}},
+	}
+	trace, _ := assemble(&a, stream_of({record}))
+	entities, _ := materialise(trace, 0, context.temp_allocator)
+
+	testing.expect_value(t, len(entities), 1)
+	self := entities[0]
+	testing.expect_value(t, len(self.members), 2)
+	// The field refers to the object it lives in. That is what tells a student
+	// it is a cycle rather than a picture that ran out of room.
+	testing.expect_value(t, self.members[1].refers_to, self.id)
+	// And the variable points at the same object, not a copy of it.
+	testing.expect_value(t, trace.steps[0].frames[0].slots[0].refers_to, self.id)
+}
+
+@(test)
+an_unfollowed_pointer_refers_to_nothing :: proc(t: ^testing.T) {
+	// SPEC-MEM-031: a rawptr, a procedure pointer, a pointer to a scalar, and a
+	// pointer whose target type is absent are never followed. The model must
+	// then produce a pointer value with NO reference.
+	//
+	// A reference invented here is a fabricated object, which is the failure
+	// the whole project is built against.
+	a: Assembly
+	assert(assembly_init(&a) == nil)
+	defer assembly_destroy(&a)
+
+	unshaped := tutor_obs.Value {
+		state = .Valid, kind = .Pointer, type_name = "rawptr",
+		data = 0x9999, text = "->", address = 0xA,
+	}
+	vars := []tutor_obs.Variable{{name = "unshaped", value = unshaped}}
+	// No `objects`: the adapter followed nothing, so the core knows nothing.
+	trace, _ := assemble(&a, stream_of({{index = 0, line = 1, frames = {one_frame(vars)}}}))
+
+	slot := trace.steps[0].frames[0].slots[0]
+	testing.expect_value(t, slot.refers_to, NO_ID)
+	testing.expect_value(t, slot.text, "->")
+}

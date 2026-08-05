@@ -93,17 +93,36 @@ Returned :: struct {
 	value:     Value  `json:"value"`,
 }
 
+// Discovered is one object the adapter reached by following a pointer.
+//
+// It is a flat list per step, not a value nested inside the pointer that found
+// it. A cyclic structure cannot be nested — it would recurse forever — so the
+// objects are laid out side by side and the pointers refer to them by address.
+// The core mints one identity per address, which is how a node that points at
+// itself shows its OWN identifier inside itself. See SPEC-MEM-030, REQ-MEM-011.
+Discovered :: struct {
+	address: u64   `json:"address"`,
+	value:   Value `json:"value"`,
+}
+
 // Record is one stop of the target program.
 Record :: struct {
-	index:     int        `json:"index"`,
-	file:      string     `json:"file"`,
-	line:      int        `json:"line"`,
-	frames:    []Frame    `json:"frames"`,
-	returned:  []Returned `json:"returned,omitempty"`,
+	index:     int          `json:"index"`,
+	file:      string       `json:"file"`,
+	line:      int          `json:"line"`,
+	frames:    []Frame      `json:"frames"`,
+	// objects are what pointer expansion reached at this step, breadth-first
+	// and bounded by both expansion budgets. See SPEC-PERF-021.
+	objects:   []Discovered `json:"objects,omitempty"`,
+	// expansion_truncated says a budget stopped the reading. It is the
+	// difference between "the graph ends here" and "we stopped looking".
+	// See SPEC-SAFE-030.
+	expansion_truncated: bool `json:"expansion_truncated,omitempty"`,
+	returned:  []Returned   `json:"returned,omitempty"`,
 	// stdout_len is the cumulative byte count of the target's output at this
 	// stop. Bytes, not characters: the unit is in the name on purpose.
 	// See SPEC-SAFE-031.
-	stdout_len: int       `json:"stdout_len"`,
+	stdout_len: int         `json:"stdout_len"`,
 }
 
 // Termination says why the run stopped. Every value here is a fact the

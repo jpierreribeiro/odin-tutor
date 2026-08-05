@@ -649,6 +649,17 @@ memory was freed". Its priority rises accordingly.
 Until then, [SPEC-MEM-032](MEMORY-MODEL.md#spec-mem-032) states the limit, and
 the documentation must not imply the tool finds use-after-free.
 
+**Pointer expansion widened this, 2026-08-05.** Before Phase 2 the student met
+R-21 only where their own code read a freed pointer. Now the tool follows
+pointers, so any node still reachable through a stale pointer is *drawn*, with
+whatever the freed region happens to hold. Tracing `linked-list-4` past its
+`free` calls shows two nodes carrying `-8516251251570781361` where they held 4
+and 3 a step earlier.
+
+Nothing about this is a new defect — the values are what the memory says, and the
+same limit produced them. What changed is how much of the picture it can reach.
+That raises the priority of Phase 6 again rather than lowering it.
+
 ---
 
 ## 4. Risks deliberately not carried

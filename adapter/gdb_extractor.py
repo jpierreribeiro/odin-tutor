@@ -249,6 +249,134 @@ def read_struct(value, t, type_name, depth):
     }
 
 
+def expandable(t):
+    """Is this a pointer the adapter is allowed to read through?
+
+    SPEC-MEM-031. The model does NOT read through a rawptr, a procedure
+    pointer, a pointer whose target type is absent from the debug information,
+    or a pointer to a scalar.
+
+    Reading through a pointer with no declared shape is guessing at the shape,
+    and a guess drawn as a picture is indistinguishable from knowledge. "It
+    looks like a struct" is the tempting change AGENT-GUIDE §6 forbids.
+
+    A pointer to a scalar is excluded by the specification rather than by
+    safety: `p := new(int)` has a shape, but expanding it produces an object
+    whose whole content is one number the student can already see.
+    """
+    try:
+        if t.code != gdb.TYPE_CODE_PTR:
+            return False
+        target = t.target().strip_typedefs()
+    except Exception:  # noqa: BLE001
+        return False
+    if target.code == gdb.TYPE_CODE_VOID:
+        return False  # rawptr
+    if target.code == gdb.TYPE_CODE_FUNC:
+        return False
+    return target.code in (gdb.TYPE_CODE_STRUCT, gdb.TYPE_CODE_ARRAY, gdb.TYPE_CODE_UNION)
+
+
+class Expansion:
+    """One step's worth of following pointers.
+
+    Breadth-first, with a visited set, so a cyclic structure terminates
+    (REQ-MEM-011, SPEC-PERF-024). The visited set is keyed by address: a node
+    that points at itself is discovered once, and the pointer field still
+    carries that address, so the core resolves it to the object's OWN identity.
+    That is what tells a student it is a cycle rather than a picture that ran
+    out of room.
+
+    Two budgets, not one. A per-step bound alone leaves the product unbounded:
+    cost is steps × expansions per step. A prior system measured a linked
+    structure at 20 nodes in 1.7 s, 40 in 3.4 s, 80 in 12 s, and 150 as a
+    timeout, with a per-step bound in place. See SPEC-PERF-021, ADR-006.
+    """
+
+    def __init__(self, run):
+        self.run = run
+        self.visited = set()
+        self.queue = []          # (address, pointer type), never a live gdb.Value
+        self.objects = []
+        self.this_step = 0
+        self.truncated = False
+
+    def offer(self, value):
+        """Note a pointer worth following. Reads nothing yet."""
+        try:
+            pointer_type = value.type.strip_typedefs()
+            if not expandable(pointer_type):
+                return
+            address = int(value)
+        except Exception:  # noqa: BLE001
+            return
+        if address == 0 or address in self.visited:
+            return
+        self.visited.add(address)
+        # The type is queued, not the value: a gdb.Value borrowed from a frame
+        # does not outlive the traversal, and the pointer is reconstructed from
+        # the address when its turn comes.
+        self.queue.append((address, pointer_type))
+
+    def drain(self):
+        """Read every queued target, breadth-first, within both budgets."""
+        while self.queue:
+            if self.this_step >= BUDGETS["expansions_per_step"]:
+                self.truncated = True
+                return
+            if self.run.expansions_total >= BUDGETS["expansions_total"]:
+                self.truncated = True
+                return
+
+            address, pointer_type = self.queue.pop(0)
+            self.this_step += 1
+            self.run.expansions_total += 1
+            target_name = str(pointer_type.target())
+
+            try:
+                target = gdb.Value(address).cast(pointer_type).dereference()
+                observed = read_value(target)
+                observed["address"] = address
+                self.objects.append({"address": address, "value": observed})
+                # A struct's own pointer fields feed the next level. This is
+                # where a cycle closes: the address is already in `visited`, so
+                # it is not read again, and the field still carries it - which
+                # is how the core resolves it to the object's OWN identity.
+                self.offer_fields(target)
+            except gdb.MemoryError as exc:
+                # A genuinely unmapped address. Measured: 0xdeadbeef raises this
+                # and the process survives. The object is RECORDED as unreadable
+                # rather than dropped, so the student sees that something is
+                # there and could not be read - omitting it would say the
+                # pointer led nowhere.
+                self.objects.append({
+                    "address": address,
+                    "value": unreadable(target_name, str(exc)),
+                })
+            except Exception as exc:  # noqa: BLE001
+                self.objects.append({
+                    "address": address,
+                    "value": unknown(target_name, str(exc)),
+                })
+
+    def offer_fields(self, target):
+        """Queue the pointers inside a struct that was just read."""
+        try:
+            t = target.type.strip_typedefs()
+            if t.code != gdb.TYPE_CODE_STRUCT:
+                return
+            fields = t.fields()
+        except Exception:  # noqa: BLE001
+            return
+        for field in fields[: BUDGETS["fields"]]:
+            if field.name is None:
+                continue
+            try:
+                self.offer(target[field.name])
+            except Exception:  # noqa: BLE001
+                continue
+
+
 def sal_line(frame):
     try:
         sal = frame.find_sal()
@@ -308,7 +436,7 @@ def in_student_source(frame):
     return name.endswith(os.path.basename(SOURCE)), name
 
 
-def collect_frames(frame):
+def collect_frames(frame, expansion=None):
     frames = []
     depth = 0
     f = frame
@@ -354,6 +482,13 @@ def collect_frames(frame):
                         }
                     else:
                         observed = read_value(value)
+                        if expansion is not None:
+                            # A pointer local feeds level 2; a struct local's
+                            # own pointer fields feed it too. Both calls ignore
+                            # a value of the wrong shape, so the caller does not
+                            # have to know which it has (SPEC-MEM-030).
+                            expansion.offer(value)
+                            expansion.offer_fields(value)
                 except gdb.MemoryError as exc:
                     observed = unreadable("?", str(exc))
                 except Exception as exc:
@@ -383,6 +518,9 @@ class Run:
         self.detail = ""
         self.extra_threads = []
         self.started = time.time()
+        # Per TRACE, not per step. Cost is steps x expansions per step, so a
+        # per-step bound alone leaves the product unbounded. See SPEC-PERF-021.
+        self.expansions_total = 0
 
     def on_new_thread(self, event):
         # Detection is by event, not by counting.
@@ -463,14 +601,23 @@ def main():
                 break
 
         sal = frame.find_sal()
-        run.records.append({
+        expansion = Expansion(run)
+        frames = collect_frames(frame, expansion)
+        expansion.drain()
+        record = {
             "index": index,
             "file": os.path.basename(sal.symtab.filename) if sal and sal.symtab else "",
             "line": sal.line if sal else 0,
-            "frames": collect_frames(frame),
+            "frames": frames,
+            "objects": expansion.objects,
             "returned": [],
             "stdout_len": 0,
-        })
+        }
+        if expansion.truncated:
+            # A budget stopped the reading. Saying so is the difference between
+            # "the graph ends here" and "we stopped looking". SPEC-SAFE-030.
+            record["expansion_truncated"] = True
+        run.records.append(record)
         index += 1
         try:
             gdb.execute("step", to_string=True)

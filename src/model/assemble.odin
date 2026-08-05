@@ -177,6 +177,61 @@ build_step :: proc(
 	current := make(map[Id]Entity, allocator)
 	truncations := make([dynamic]Truncation, allocator)
 
+	// Level 1 of SPEC-MEM-030: every object the adapter reached by following a
+	// pointer gets its identity BEFORE any of them is built.
+	//
+	// Two passes, and the reason is the cycle. A node whose `next` points at
+	// itself needs its own identity to already exist when its field is
+	// resolved. Minting as we go would leave the first object's self-reference
+	// unresolvable, and "unresolvable" would render as a pointer into nothing —
+	// which is how a cycle gets drawn as a dead end.
+	discovered := make(map[u64]Id, allocator)
+	for object in record.objects {
+		if object.address == 0 {
+			continue
+		}
+		discovered[object.address] = identity_for(&a.registry, Key{
+			kind      = .Object,
+			address   = object.address,
+			type_name = object.value.type_name,
+			epoch     = epoch_for(&a.registry, object.address, object.value.type_name),
+		})
+	}
+
+	for object in record.objects {
+		id, found := discovered[object.address]
+		if !found {
+			continue
+		}
+		if len(current) >= a.config.objects_per_step {
+			if len(truncations) == 0 {
+				append(&truncations, Truncation{"objects", a.config.objects_per_step})
+			}
+			break
+		}
+		entity := Entity {
+			id        = id,
+			kind      = .Object,
+			type_name = object.value.type_name,
+			text      = object.value.text,
+			length    = object.value.length,
+		}
+		members := make([dynamic]Slot, allocator)
+		for member in object.value.members {
+			append(&members, slot_from_value(a, member, discovered, &current, &truncations))
+		}
+		entity.members = members[:]
+		current[id] = entity
+		note_seen(&a.registry, object.address, object.value.type_name, index)
+	}
+
+	if record.expansion_truncated && len(truncations) == 0 {
+		// A budget stopped the reading, not the graph. Saying so is what keeps
+		// "the object ends here" apart from "we stopped looking".
+		// See SPEC-SAFE-030, ADR-011.
+		append(&truncations, Truncation{"expansions", a.config.declared_budgets.expansions_per_step})
+	}
+
 	for frame in record.frames {
 		key := Key {
 			kind      = .Object,
@@ -188,25 +243,9 @@ build_step :: proc(
 
 		slots := make([dynamic]Slot, allocator)
 		for variable in frame.variables {
-			slot := Slot {
-				name   = variable.name,
-				state  = state_from_obs(variable.value.state),
-				reason = variable.value.reason,
-			}
-			if slot.state == .Valid {
-				#partial switch variable.value.kind {
-				case .Scalar:
-					slot.text = variable.value.text
-				case:
-					entity, id := entity_from_value(a, variable.value)
-					slot.refers_to = id
-					if len(current) < a.config.objects_per_step {
-						current[id] = entity
-						note_seen(&a.registry, variable.value.data, variable.value.type_name, index)
-					} else if len(truncations) == 0 {
-						append(&truncations, Truncation{"objects", a.config.objects_per_step})
-					}
-				}
+			slot := slot_from_value(a, variable, discovered, &current, &truncations)
+			if slot.state == .Valid && variable.value.data != 0 {
+				note_seen(&a.registry, variable.value.data, variable.value.type_name, index)
 			}
 			append(&slots, slot)
 		}
@@ -246,6 +285,59 @@ build_step :: proc(
 		stdout_len  = record.stdout_len,
 		truncations = truncations[:],
 	}
+}
+
+// slot_from_value turns one observed variable or field into a slot.
+//
+// The pointer branch is the whole point. A pointer whose target the adapter
+// reached becomes a REFERENCE to that object's identity — a label, never an
+// address (ADR-007, SPEC-MEM-001). A pointer whose target it did not reach
+// keeps its own text and refers to nothing, which is what SPEC-MEM-031 requires
+// for a rawptr, a procedure pointer, a pointer to a scalar, and a pointer whose
+// target type the debug information does not describe.
+//
+// The difference matters more than it looks. "refers to #4" is a fact. An
+// address printed where a reference belongs teaches the student to think in
+// addresses, which is the habit this tool exists to replace.
+slot_from_value :: proc(
+	a: ^Assembly,
+	variable: tutor_obs.Variable,
+	discovered: map[u64]Id,
+	current: ^map[Id]Entity,
+	truncations: ^[dynamic]Truncation,
+) -> Slot {
+	slot := Slot {
+		name   = variable.name,
+		state  = state_from_obs(variable.value.state),
+		reason = variable.value.reason,
+	}
+	if slot.state != .Valid {
+		return slot
+	}
+
+	#partial switch variable.value.kind {
+	case .Scalar:
+		slot.text = variable.value.text
+	case .Pointer:
+		if variable.value.data != 0 {
+			if target, found := discovered[variable.value.data]; found {
+				slot.refers_to = target
+				return slot
+			}
+		}
+		// Not followed, or followed and not reachable. Say so with the
+		// pointer's own text rather than inventing a target.
+		slot.text = variable.value.text
+	case:
+		entity, id := entity_from_value(a, variable.value)
+		slot.refers_to = id
+		if len(current) < a.config.objects_per_step {
+			current[id] = entity
+		} else if len(truncations) == 0 {
+			append(truncations, Truncation{"objects", a.config.objects_per_step})
+		}
+	}
+	return slot
 }
 
 // mark_only_real_sharing clears the sharing mark on a view that is alone.
