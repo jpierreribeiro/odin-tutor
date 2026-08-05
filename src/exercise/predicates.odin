@@ -20,6 +20,7 @@ Subject :: struct {
 	text:      string,
 	state:     tutor_model.Value_State,
 	refers_to: tutor_model.Id,
+	is_reference: bool,
 }
 
 // resolve walks a path such as "main:head.next.next".
@@ -63,10 +64,11 @@ resolve :: proc(
 	for slot in step.frames[frame_index].slots {
 		if slot.name == parts[0] {
 			subject = Subject {
-				found     = true,
-				text      = slot.text,
-				state     = slot.state,
-				refers_to = slot.refers_to,
+				found        = true,
+				text         = slot.text,
+				state        = slot.state,
+				refers_to    = slot.refers_to,
+				is_reference = slot.is_reference,
 			}
 			found = true
 			break
@@ -93,6 +95,7 @@ resolve :: proc(
 					text      = member.text,
 					state     = member.state,
 					refers_to = member.refers_to,
+					is_reference = member.is_reference,
 				}
 				reached = true
 				break
@@ -363,6 +366,12 @@ apply :: proc(
 		case:
 			return verdict_of(!shares && x.refers_to != y.refers_to), "neither the same object nor the same buffer"
 		}
+	case "is_reference":
+		// SPEC-VAL-024. `p := &thing` and `thing` reach the same object and are
+		// not the same variable. Without this an exercise cannot ask for an
+		// allocation rather than a local, because every other predicate reads
+		// the same on both.
+		return verdict_of(a.is_reference), a.is_reference ? "a pointer" : "the object itself"
 	case "is_nil":
 		if a.refers_to != tutor_model.NO_ID {
 			return .Fail, "it refers to an object"

@@ -34,6 +34,10 @@ Slot :: struct {
 	// refers_to is the identity of the entity this slot points at, or 0.
 	// The interface prints it as a label. It is never an address.
 	refers_to: Id       `json:"refers_to,omitempty"`,
+	// is_reference separates a POINTER from the object itself. Both reach an
+	// entity, and an exercise that asks for an allocation rather than a local
+	// has no other way to say so. See SPEC-VAL-024.
+	is_reference: bool  `json:"is_reference,omitempty"`,
 	reason:    string   `json:"reason,omitempty"`,
 }
 

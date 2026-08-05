@@ -17,15 +17,20 @@
     {
       "id": "A1",
       "at": "any",
-      "expr": "type_of(\"node\") == \"struct main::Node\""
+      "expr": "is_reference(\"node\")"
     },
     {
       "id": "A2",
       "at": "any",
-      "expr": "value_of(\"node.value\") == \"7\""
+      "expr": "type_of(\"node\") == \"struct main::Node\""
     },
     {
       "id": "A3",
+      "at": "any",
+      "expr": "value_of(\"node.value\") == \"7\""
+    },
+    {
+      "id": "A4",
       "at": "final",
       "expr": "output_equals(\"7\\n\")"
     }

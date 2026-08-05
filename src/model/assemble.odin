@@ -405,6 +405,9 @@ slot_from_value :: proc(
 		if variable.value.data != 0 {
 			if target, found := discovered[variable.value.data]; found {
 				slot.refers_to = target
+				// A pointer, not the object. Both reach an entity; only this
+				// says which one the student wrote (SPEC-VAL-024).
+				slot.is_reference = true
 				return slot
 			}
 		}

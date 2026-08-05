@@ -103,6 +103,23 @@ differently. That is not evidence of a wrong picture.
 | `not_shares_storage(a, b)` | Both resolve to views whose storage identities differ, or either has no storage. |
 | `distinct(a, b)` | `not_alias(a, b)` **and** `not_shares_storage(a, b)`. |
 | `is_nil(a)` | The path resolves to a pointer value that is null. |
+| `is_reference(a)` | The path resolves to a **pointer**, rather than to the object itself. |
+
+<a id="spec-val-024"></a>
+### SPEC-VAL-024 — A reference and the thing it refers to are different subjects
+`p := &thing` and `thing` reach the same object, and they are not the same
+variable. Without this predicate an exercise cannot say "this must be allocated"
+or "pass a pointer, not a copy": a local struct and a pointer to one both resolve
+to an object, and every assertion available reads the same on both.
+
+*Rationale:* found while writing `10-new-and-free`. Its wrong solution used a
+local where the exercise asked for an allocation, and no predicate in this
+document could tell them apart, so the exercise accepted it. An exercise that
+accepts a wrong answer has not been shown to distinguish anything
+([SPEC-EX-052](EXERCISE-SPEC.md)).
+
+This is what [SPEC-EX-040](EXERCISE-SPEC.md#spec-ex-040) means by a tag that
+cannot be asserted on being a gap tracked here. `pointer` was such a tag.
 
 <a id="spec-val-021"></a>
 ### SPEC-VAL-021 — `alias` and `shares_storage` are separate predicates

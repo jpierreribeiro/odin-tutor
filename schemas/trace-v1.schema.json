@@ -4,19 +4,50 @@
   "title": "Trace, version 1",
   "description": "The artefact a consumer reads. Navigation reads this and never re-executes. See docs/TRACE-SPEC.md.",
   "type": "object",
-  "required": ["trace_version", "source_file", "keyframe_interval", "steps", "termination"],
+  "required": [
+    "trace_version",
+    "source_file",
+    "keyframe_interval",
+    "steps",
+    "termination"
+  ],
   "additionalProperties": false,
   "properties": {
-    "trace_version": { "const": 1 },
-    "source_file": { "type": "string" },
-    "odin_version": { "type": "string" },
-    "debugger": { "type": "string" },
-    "keyframe_interval": { "type": "integer", "minimum": 1, "description": "K from ADR-005. A keyframe at least every K steps bounds a jump to K-1 delta applications and contains the damage of a bad delta to one interval. K = 1 yields full snapshots and is a supported debugging mode." },
-    "steps": { "type": "array", "items": { "$ref": "#/$defs/step" } },
-    "termination": { "$ref": "#/$defs/termination" },
-    "detail": { "type": "string" },
-    "stdout": { "type": "string" },
-    "exit_code": { "type": "integer" }
+    "trace_version": {
+      "const": 1
+    },
+    "source_file": {
+      "type": "string"
+    },
+    "odin_version": {
+      "type": "string"
+    },
+    "debugger": {
+      "type": "string"
+    },
+    "keyframe_interval": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "K from ADR-005. A keyframe at least every K steps bounds a jump to K-1 delta applications and contains the damage of a bad delta to one interval. K = 1 yields full snapshots and is a supported debugging mode."
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/step"
+      }
+    },
+    "termination": {
+      "$ref": "#/$defs/termination"
+    },
+    "detail": {
+      "type": "string"
+    },
+    "stdout": {
+      "type": "string"
+    },
+    "exit_code": {
+      "type": "integer"
+    }
   },
   "$defs": {
     "id": {
@@ -25,11 +56,23 @@
       "minimum": 0,
       "maximum": 1000000
     },
-    "value_state": { "type": "integer", "enum": [0, 1, 2, 3] },
+    "value_state": {
+      "type": "integer",
+      "enum": [
+        0,
+        1,
+        2,
+        3
+      ]
+    },
     "entity_kind": {
       "description": "0 Storage, 1 View, 2 Object. Collapsing the three is how a sub-slice inherits its parent's length.",
       "type": "integer",
-      "enum": [0, 1, 2]
+      "enum": [
+        0,
+        1,
+        2
+      ]
     },
     "termination": {
       "description": "0 Completed, 1 Limit_Steps, 2 Limit_Wall_Time, 3 Limit_Trace_Bytes, 4 Target_Crashed, 5 Target_Became_Multithreaded, 6 Debug_Info_Missing, 7 Adapter_Failed.",
@@ -39,72 +82,198 @@
     },
     "slot": {
       "type": "object",
-      "required": ["name", "state"],
+      "required": [
+        "name",
+        "state"
+      ],
       "additionalProperties": false,
       "properties": {
-        "name": { "type": "string" },
-        "state": { "$ref": "#/$defs/value_state" },
-        "text": { "type": "string" },
-        "refers_to": { "$ref": "#/$defs/id" },
-        "reason": { "type": "string" }
+        "name": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/value_state"
+        },
+        "text": {
+          "type": "string"
+        },
+        "refers_to": {
+          "$ref": "#/$defs/id"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "is_reference": {
+          "type": "boolean",
+          "description": "The slot holds a POINTER rather than the object itself. Both reach an entity; only this says which the student wrote. See SPEC-VAL-024."
+        }
       }
     },
     "frame_view": {
       "type": "object",
-      "required": ["id", "procedure", "line", "depth"],
+      "required": [
+        "id",
+        "procedure",
+        "line",
+        "depth"
+      ],
       "additionalProperties": false,
       "properties": {
-        "id": { "$ref": "#/$defs/id" },
-        "procedure": { "type": "string" },
-        "line": { "type": "integer", "minimum": 0 },
-        "depth": { "type": "integer", "minimum": 0 },
-        "slots": { "type": "array", "items": { "$ref": "#/$defs/slot" } },
-        "returned_text": { "type": "string", "description": "Present ONLY when the value was attributed to this exact invocation. Absent means withheld, which is allowed. A wrong value is not." }
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "procedure": {
+          "type": "string"
+        },
+        "line": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "depth": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "slots": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/slot"
+          }
+        },
+        "returned_text": {
+          "type": "string",
+          "description": "Present ONLY when the value was attributed to this exact invocation. Absent means withheld, which is allowed. A wrong value is not."
+        }
       }
     },
     "entity": {
       "type": "object",
-      "required": ["id", "kind", "type_name"],
+      "required": [
+        "id",
+        "kind",
+        "type_name"
+      ],
       "additionalProperties": false,
       "properties": {
-        "id": { "$ref": "#/$defs/id" },
-        "kind": { "$ref": "#/$defs/entity_kind" },
-        "type_name": { "type": "string" },
-        "text": { "type": "string" },
-        "members": { "type": "array", "items": { "$ref": "#/$defs/slot" } },
-        "shares_storage_with": { "$ref": "#/$defs/id" },
-        "length": { "type": "integer", "minimum": 0, "description": "The view's OWN length, never its parent's." }
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "kind": {
+          "$ref": "#/$defs/entity_kind"
+        },
+        "type_name": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "members": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/slot"
+          }
+        },
+        "shares_storage_with": {
+          "$ref": "#/$defs/id"
+        },
+        "length": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "The view's OWN length, never its parent's."
+        }
       }
     },
     "truncation": {
       "description": "A budget was reached at this step. Every limit is visible to the student, because a limit that is not shown makes a missing element look like an absent one. See REQ-SAFE-005.",
       "type": "object",
-      "required": ["what", "limit"],
+      "required": [
+        "what",
+        "limit"
+      ],
       "additionalProperties": false,
       "properties": {
-        "what": { "type": "string" },
-        "limit": { "type": "integer", "minimum": 0 }
+        "what": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 0
+        }
       }
     },
     "step": {
       "type": "object",
-      "required": ["index", "file", "line", "keyframe", "stdout_len"],
+      "required": [
+        "index",
+        "file",
+        "line",
+        "keyframe",
+        "stdout_len"
+      ],
       "additionalProperties": false,
       "properties": {
-        "index": { "type": "integer", "minimum": 0 },
-        "file": { "type": "string" },
-        "line": { "type": "integer", "minimum": 0 },
-        "keyframe": { "type": "boolean" },
-        "frames": { "type": "array", "items": { "$ref": "#/$defs/frame_view" } },
-        "entities": { "type": "array", "items": { "$ref": "#/$defs/entity" }, "description": "Every entity at a keyframe; only those that changed at a delta. A changed entity is emitted WHOLE: whole-entity replacement makes materialisation trivially correct. See SPEC-TRACE-003." },
-        "removed": { "type": "array", "items": { "$ref": "#/$defs/id" } },
-        "stdout_len": { "type": "integer", "minimum": 0 },
-        "truncations": { "type": "array", "items": { "$ref": "#/$defs/truncation" } }
+        "index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "file": {
+          "type": "string"
+        },
+        "line": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "keyframe": {
+          "type": "boolean"
+        },
+        "frames": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/frame_view"
+          }
+        },
+        "entities": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/entity"
+          },
+          "description": "Every entity at a keyframe; only those that changed at a delta. A changed entity is emitted WHOLE: whole-entity replacement makes materialisation trivially correct. See SPEC-TRACE-003."
+        },
+        "removed": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          }
+        },
+        "stdout_len": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "truncations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/truncation"
+          }
+        }
       },
       "allOf": [
         {
-          "if": { "properties": { "keyframe": { "const": true } }, "required": ["keyframe"] },
-          "then": { "properties": { "removed": { "maxItems": 0 } } }
+          "if": {
+            "properties": {
+              "keyframe": {
+                "const": true
+              }
+            },
+            "required": [
+              "keyframe"
+            ]
+          },
+          "then": {
+            "properties": {
+              "removed": {
+                "maxItems": 0
+              }
+            }
+          }
         }
       ]
     }
