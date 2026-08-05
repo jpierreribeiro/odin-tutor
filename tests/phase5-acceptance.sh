@@ -202,6 +202,71 @@ fi
 
 # ---------------------------------------------------------------------------
 echo
+echo "there is a student loop, not only a validator"
+
+# THE CRITERION THE ROADMAP DID NOT ASK FOR, and the reason it is here.
+#
+# The four criteria above all passed while there was NO WAY FOR A STUDENT TO
+# START. Every reference solution passed, every exercise rejected a wrong
+# solution, truncation was undetermined, no budget was reached - and using any
+# of it meant typing an exercise directory and an --entry flag that existed only
+# so this script could point at solution.odin.
+#
+# EXERCISE-SPEC.md §3 described the loop the whole time. Passing tests hid a
+# missing goal, in the one layer the rules did not cover, so the checks below
+# exist to stop that recurring.
+export XDG_STATE_HOME="$work/state"
+rm -rf "$XDG_STATE_HOME"
+
+# 1. A bare invocation is the student's command, not a usage error.
+if "$tool" list > "$work/list.txt" 2>&1; then
+	if grep -q '0 of 3 finished' "$work/list.txt"; then
+		ok "list shows every exercise with done and not-done"
+	else
+		bad "list did not report progress" "$(head -4 "$work/list.txt")"
+	fi
+else
+	bad "list failed" "$(head -3 "$work/list.txt")"
+fi
+
+# 2. Progress is state the student never types.
+python3 - "$XDG_STATE_HOME" <<'SCRIPT'
+import json, os, pathlib, sys
+root = pathlib.Path(sys.argv[1]) / "odin-tutor"
+root.mkdir(parents=True, exist_ok=True)
+(root / "progress.json").write_text(json.dumps({"completed": ["01-variables"]}))
+SCRIPT
+if "$tool" list 2>&1 | grep -q 'done  01-variables'; then
+	ok "a finished exercise is remembered across runs"
+else
+	bad "progress was not read back"
+fi
+if "$tool" list 2>&1 | grep -q '1 of 3 finished'; then
+	ok "and the count reflects it"
+else
+	bad "the finished count did not move"
+fi
+
+# 3. The next exercise is chosen FOR the student.
+if "$tool" hint 2>&1 | grep -q 'slice is a pointer and a length'; then
+	ok "hint answers for the exercise the student is on, unnamed"
+else
+	bad "hint did not pick up the current exercise" \
+		"The student would have to know which one they are on."
+fi
+
+# 4. Every exercise the course ships can actually be hinted.
+for id in $exercises; do
+	if [ -f "exercises/$id/hints.md" ]; then
+		ok "$id has a hint written"
+	else
+		bad "$id declares hints and has none" "The field is read now; an empty one is a dead end."
+	fi
+done
+rm -rf "$XDG_STATE_HOME"
+
+# ---------------------------------------------------------------------------
+echo
 echo "$passed passed, $failed failed"
 [ "$failed" -eq 0 ] || exit 1
 echo

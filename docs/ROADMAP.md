@@ -416,6 +416,21 @@ frame panel incomplete.
 > the output assertion and fails the sharing one**. It prints `3 2`, exactly
 > like the reference. Every test that compares printed text accepts it, and only
 > the picture separates them.
+>
+> **The four criteria below did not ask for a student loop, and for a while
+> there was none.** All four passed while starting the course meant typing an
+> exercise directory and an `--entry` flag that existed so the acceptance script
+> could point at `solution.odin`. §3 of [EXERCISE-SPEC.md](EXERCISE-SPEC.md)
+> described the loop the whole time.
+>
+> Passing tests hid a missing goal, in the layer the rules did not cover. The
+> loop now exists — `odin-tutor` with no arguments, progress, auto-advance,
+> `list`, `hint` — and the acceptance script gained a section for it so the same
+> gap cannot reopen silently.
+>
+> Still short of [CURRICULUM.md](CURRICULUM.md): three exercises exist where it
+> describes a sequence. That is content, not mechanism, and it is written down
+> rather than implied.
 
 **Goal:** the tool becomes a course rather than a viewer.
 

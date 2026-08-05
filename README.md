@@ -32,6 +32,8 @@ export ODIN_ROOT=/path/to/Odin        # core: imports fail without it
 ./tests/phase3-acceptance.sh
 ./tests/phase4-acceptance.sh
 ./tests/phase5-acceptance.sh
+./tests/phase6-acceptance.sh
+./tests/adapter-conformance.sh        # would a second adapter draw the same picture?
 
 ./odin-tutor trace fixtures/programs/sub-slice.odin trace.json
 ./odin-tutor render trace.json 4
@@ -58,9 +60,14 @@ assembles it. The recorded stream replays to a byte-identical trace with gdb
 uninstalled, which is what makes every later phase testable in milliseconds.
 
 ```sh
-odin-tutor play trace.json                        # step through it
-odin-tutor check exercises/03-slices-share-storage
+odin-tutor                 # start, or pick up where you left off
+odin-tutor list            # what is done and what is not
+odin-tutor hint            # for the exercise you are on
 ```
+
+One command with no arguments. It chooses the next unfinished exercise, watches
+the file you edit, re-runs on every save, and moves on by itself when you pass.
+You never type an exercise name.
 
 The exercise that explains the whole project: its wrong solution prints `3 2`,
 exactly like the reference solution, and fails anyway.
@@ -73,9 +80,16 @@ exactly like the reference solution, and fails anyway.
 Every test that compares printed output accepts that program. Only the picture
 separates a window onto an array from a copy of part of it.
 
-Two known gaps ship, both written down and both with tests: allocation identity
-after a free ([R-07](docs/RISKS.md)) and use-after-free detection
-([R-21](docs/RISKS.md#r-21)). Neither fabricates a picture.
+Phase 6a closed [R-07](docs/RISKS.md#r-07): the adapter records what the program
+hands back to the allocator, so a freed address and the next allocation at it are
+two identities rather than one.
+
+What remains is written down, with tests rather than hopes: use-after-free is not
+detectable by reading ([R-21](docs/RISKS.md#r-21)), an explicitly uninitialised
+local cannot be told from an initialised one ([R-22](docs/RISKS.md)), and a map
+shows its count with its entries `unknown`
+([ADR-014](docs/decisions/ADR-014-maps-are-counted-not-walked.md)). None of them
+fabricates a picture.
 See [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 Read [`docs/PROJECT.md`](docs/PROJECT.md) first, then

@@ -197,11 +197,30 @@ cache_root :: proc(allocator := context.allocator) -> string {
 // picture from one toolchain while the tool reports another
 // (SPEC-PLAT-030, AGENT-GUIDE §6).
 //
-// FNV-1a over the source bytes and the version string. Not a security hash:
-// nothing here defends against a chosen collision, and saying so is cheaper
-// than the next reader wondering.
-cache_key :: proc(source_bytes: []byte, odin_version: string, allocator := context.allocator) -> string {
-	digest := hash.fnv64a(source_bytes)
+// THE SECOND TRAP, and it took a live run to find: THE PATH IS PART OF THE KEY.
+//
+// Two files with identical CONTENT compile to executables whose debug
+// information names different source files. The adapter decides whether a stop
+// is in the student's code by comparing the file name, so handing it an
+// executable built from another path makes every stop look foreign — and the
+// trace comes back EMPTY, with every assertion undecidable and nothing saying
+// why.
+//
+// It happened exactly this way: a student's `start.odin` was edited into the
+// content of the `solution.odin` beside it, hit the cached build of that
+// solution, and the exercise stopped being checkable.
+//
+// FNV-1a over the path, the source bytes and the version string. Not a security
+// hash: nothing here defends against a chosen collision, and saying so is
+// cheaper than the next reader wondering.
+cache_key :: proc(
+	source_path: string,
+	source_bytes: []byte,
+	odin_version: string,
+	allocator := context.allocator,
+) -> string {
+	digest := hash.fnv64a(transmute([]byte)source_path)
+	digest = hash.fnv64a(source_bytes, digest)
 	digest = hash.fnv64a(transmute([]byte)odin_version, digest)
 	return fmt.aprintf("%016x", digest, allocator = allocator)
 }
@@ -230,7 +249,7 @@ build :: proc(
 		return {}, .Cache_Unwritable
 	}
 
-	key := cache_key(source_bytes, versions.odin, context.temp_allocator)
+	key := cache_key(source_path, source_bytes, versions.odin, context.temp_allocator)
 	result.executable = strings.concatenate({root, "/", key}, allocator)
 
 	if os.exists(result.executable) {

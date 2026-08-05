@@ -13,8 +13,8 @@ a_cache_key_changes_when_the_toolchain_changes :: proc(t: ^testing.T) {
 	// See SPEC-PLAT-030, AGENT-GUIDE §6.
 	source := transmute([]byte)string("package main\nmain :: proc() {}\n")
 
-	first := cache_key(source, "dev-2026-07-nightly:819fdc7", context.temp_allocator)
-	second := cache_key(source, "dev-2026-08:9caff63", context.temp_allocator)
+	first := cache_key("a.odin", source, "dev-2026-07-nightly:819fdc7", context.temp_allocator)
+	second := cache_key("a.odin", source, "dev-2026-08:9caff63", context.temp_allocator)
 
 	testing.expect(t, first != second, "the same source under two compilers is two keys")
 }
@@ -22,8 +22,8 @@ a_cache_key_changes_when_the_toolchain_changes :: proc(t: ^testing.T) {
 @(test)
 a_cache_key_changes_when_the_source_changes :: proc(t: ^testing.T) {
 	version := "dev-2026-08:9caff63"
-	first := cache_key(transmute([]byte)string("x := 1"), version, context.temp_allocator)
-	second := cache_key(transmute([]byte)string("x := 2"), version, context.temp_allocator)
+	first := cache_key("a.odin", transmute([]byte)string("x := 1"), version, context.temp_allocator)
+	second := cache_key("a.odin", transmute([]byte)string("x := 2"), version, context.temp_allocator)
 	testing.expect(t, first != second, "one edited character is a different program")
 }
 
@@ -32,8 +32,8 @@ a_cache_key_is_the_same_for_the_same_inputs :: proc(t: ^testing.T) {
 	// Without this the cache never hits, and compilation dominates the loop the
 	// student edits in: 0.98 s to compile against 0.4 s to trace 300 steps.
 	source := transmute([]byte)string("package main")
-	first := cache_key(source, "dev-2026-08", context.temp_allocator)
-	second := cache_key(source, "dev-2026-08", context.temp_allocator)
+	first := cache_key("a.odin", source, "dev-2026-08", context.temp_allocator)
+	second := cache_key("a.odin", source, "dev-2026-08", context.temp_allocator)
 	testing.expect_value(t, first, second)
 }
 
@@ -82,4 +82,24 @@ the_cache_never_lives_in_the_students_directory :: proc(t: ^testing.T) {
 		strings.has_suffix(root, "/odin-tutor"),
 		"the cache is namespaced, so it never shares a directory with anything else",
 	)
+}
+
+@(test)
+identical_content_at_two_paths_is_two_keys :: proc(t: ^testing.T) {
+	// FOUND BY RUNNING IT, not by reading it.
+	//
+	// A student edited `start.odin` into exactly the content of the
+	// `solution.odin` beside it. The key matched the cached build of the
+	// solution, so the tool handed the adapter an executable whose debug
+	// information names solution.odin. The adapter decides "is this stop in the
+	// student's code?" by file name, nothing matched, and the trace came back
+	// EMPTY — every assertion undecidable, and nothing saying why.
+	//
+	// Same bytes, different file, different executable. The path is part of the
+	// key.
+	source := transmute([]byte)string("package main\nmain :: proc() {}\n")
+	version := "dev-2026-08:9caff63"
+	start := cache_key("exercises/01/start.odin", source, version, context.temp_allocator)
+	solution := cache_key("exercises/01/solution.odin", source, version, context.temp_allocator)
+	testing.expect(t, start != solution, "identical content at two paths is two executables")
 }

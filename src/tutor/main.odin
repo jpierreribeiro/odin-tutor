@@ -22,6 +22,17 @@ import tutor_tui "../tui"
 
 USAGE :: `odin-tutor — see what your Odin program does to memory
 
+  odin-tutor
+      Start. Picks up where you left off, watches the file you are editing,
+      and moves to the next exercise when this one passes. You never type an
+      exercise name.
+
+  odin-tutor list
+      Every exercise, done and not done.
+
+  odin-tutor hint
+      The next hint for the exercise you are on.
+
   odin-tutor preflight
       Check the toolchain and report what was found.
 
@@ -60,11 +71,17 @@ that your own directory is left exactly as you left it.`
 main :: proc() {
 	args := os.args[1:]
 	if len(args) == 0 {
-		fmt.println(USAGE)
-		os.exit(2)
+		// No arguments is the STUDENT'S command, not an error. A course that
+		// answers a bare name with a usage message has told the student to go
+		// and read something before they may begin.
+		os.exit(cmd_course(EXERCISES_ROOT))
 	}
 
 	switch args[0] {
+	case "list":
+		os.exit(cmd_list(EXERCISES_ROOT))
+	case "hint":
+		os.exit(cmd_hint(EXERCISES_ROOT))
 	case "preflight":
 		os.exit(cmd_preflight())
 	case "trace":
@@ -398,6 +415,203 @@ cmd_play :: proc(trace_path: string, style: tutor_render.Style) -> int {
 	return tutor_tui.run(trace, source, style)
 }
 
+EXERCISES_ROOT :: "exercises"
+
+// cmd_course is the loop from EXERCISE-SPEC.md §3.
+//
+// Pick the next unfinished exercise, watch the file the student edits, and on
+// every save: build, trace, validate. When every assertion passes, mark it done
+// and move on. The student never names an exercise, and never asks what to do
+// next — that is the whole difference between a validator and a course.
+cmd_course :: proc(root: string) -> int {
+	entries := tutor_exercise.discover(root, context.allocator)
+	if len(entries) == 0 {
+		fmt.eprintfln("NO_EXERCISES: no exercises found under %s/.", root)
+		fmt.eprintln("Run this from the repository root, where the exercises directory is.")
+		return 1
+	}
+
+	for {
+		progress := tutor_exercise.progress_load(context.temp_allocator)
+		refreshed := tutor_exercise.discover(root, context.temp_allocator)
+		entry, remaining := tutor_exercise.next_unfinished(refreshed)
+		if !remaining {
+			fmt.println()
+			fmt.printfln("All %d exercises are done. Nothing left to teach you here.", len(refreshed))
+			return 0
+		}
+
+		done := 0
+		for e in refreshed {
+			if e.done {
+				done += 1
+			}
+		}
+		fmt.println()
+		fmt.printfln("── %d/%d ── %s", done + 1, len(refreshed), entry.exercise.title)
+		fmt.println(entry.exercise.objective)
+
+		// Advisory, never a refusal. A student who jumps ahead is not wrong.
+		missing := tutor_exercise.missing_requirements(entry, progress, context.temp_allocator)
+		if len(missing) > 0 {
+			fmt.printfln("(this one builds on %s, which you have not finished — carry on if you like)",
+				strings.join(missing, ", ", context.temp_allocator))
+		}
+
+		entry_path, path_err := filepath.join(
+			{entry.directory, entry.exercise.entry}, context.temp_allocator,
+		)
+		if path_err != nil {
+			fmt.eprintln("BAD_PATH: the entry file could not be resolved.")
+			return 1
+		}
+		fmt.printfln("edit %s", entry_path)
+		fmt.println()
+
+		if watch_until_passed(entry, entry_path) {
+			marked := tutor_exercise.progress_load(context.allocator)
+			tutor_exercise.progress_mark(&marked, entry.exercise.id, context.allocator)
+			if !tutor_exercise.progress_save(marked) {
+				fmt.eprintln("PROGRESS_UNWRITABLE: could not record that you finished this one.")
+			}
+			fmt.println("Done. Moving on.")
+			continue
+		}
+		return 0
+	}
+}
+
+// watch_until_passed runs the exercise now and on every save.
+//
+// Returns true when it passed. Polling on the modification time, because the
+// alternative is a per-platform notification API and a dependency that Rule 10
+// would make us justify for every platform, to save a 300 ms wait.
+watch_until_passed :: proc(entry: tutor_exercise.Entry, entry_path: string) -> bool {
+	last: i64 = 0
+	for {
+		if run_exercise(entry, entry_path) {
+			return true
+		}
+		fmt.println()
+		fmt.println("watching for your next save — Ctrl-C to stop")
+		last = modified_at(entry_path)
+		for {
+			time.sleep(300 * time.Millisecond)
+			now := modified_at(entry_path)
+			if now != last && now != 0 {
+				break
+			}
+		}
+		fmt.println()
+	}
+}
+
+// run_exercise is one turn of the loop: build, trace, validate, report.
+run_exercise :: proc(entry: tutor_exercise.Entry, entry_path: string) -> bool {
+	results, ok := check_once(entry.exercise, entry_path)
+	if !ok {
+		return false
+	}
+
+	undetermined := 0
+	first_problem := -1
+	for r, i in results {
+		switch r.verdict {
+		case .Pass:
+			fmt.printfln("  pass          %s", r.id)
+		case .Fail:
+			fmt.printfln("  FAIL          %s  %s", r.id, r.reason)
+			if first_problem < 0 {
+				first_problem = i
+			}
+		case .Undetermined:
+			undetermined += 1
+			fmt.printfln("  undetermined  %s  %s", r.id, r.reason)
+			if first_problem < 0 {
+				first_problem = i
+			}
+		}
+	}
+
+	if tutor_exercise.passed(results) {
+		return true
+	}
+
+	// Point at the step, not just at the assertion. The Result already carries
+	// which step decided it, and a student who can open the picture there is
+	// being shown the answer rather than told about it.
+	if first_problem >= 0 && results[first_problem].step > 0 {
+		fmt.println()
+		fmt.printfln(
+			"  %s was decided at step %d. To look at it:",
+			results[first_problem].id, results[first_problem].step,
+		)
+		fmt.printfln("      odin-tutor trace %s /tmp/step.json", entry_path)
+		fmt.printfln("      odin-tutor play /tmp/step.json      (then g, %d)",
+			results[first_problem].step)
+	}
+	if undetermined > 0 {
+		fmt.println()
+		fmt.println(
+			"  Some assertions could not be decided. That is a limit of this tool, " +
+			"not a mistake in your program.",
+		)
+	}
+	if len(entry.exercise.hints) > 0 {
+		fmt.println()
+		fmt.println("  Stuck? `odin-tutor hint`")
+	}
+	return false
+}
+
+// cmd_list shows the whole course, done and not done.
+cmd_list :: proc(root: string) -> int {
+	entries := tutor_exercise.discover(root, context.temp_allocator)
+	if len(entries) == 0 {
+		fmt.eprintfln("NO_EXERCISES: no exercises found under %s/.", root)
+		return 1
+	}
+	done := 0
+	for entry in entries {
+		mark := entry.done ? "done" : "    "
+		if entry.done {
+			done += 1
+		}
+		fmt.printfln("  %s  %-28s %s", mark, entry.exercise.id, entry.exercise.title)
+	}
+	fmt.println()
+	fmt.printfln("%d of %d finished.", done, len(entries))
+	return 0
+}
+
+// cmd_hint prints the next hint for the exercise the student is on.
+cmd_hint :: proc(root: string) -> int {
+	entries := tutor_exercise.discover(root, context.temp_allocator)
+	entry, remaining := tutor_exercise.next_unfinished(entries)
+	if !remaining {
+		fmt.println("Nothing left to hint at — every exercise is done.")
+		return 0
+	}
+	if len(entry.exercise.hints) == 0 {
+		fmt.printfln("%s has no hints written yet.", entry.exercise.id)
+		return 0
+	}
+	for name in entry.exercise.hints {
+		path, err := filepath.join({entry.directory, name}, context.temp_allocator)
+		if err != nil {
+			continue
+		}
+		data, read_err := os.read_entire_file(path, context.temp_allocator)
+		if read_err != nil {
+			fmt.eprintfln("HINT_UNREADABLE: %s is named by the exercise and is not there.", path)
+			return 1
+		}
+		fmt.println(string(data))
+		return 0
+	}
+	return 0
+}
+
 // cmd_check builds an exercise's entry file, traces it, and reports every
 // assertion.
 //
@@ -471,11 +685,22 @@ modified_at :: proc(path: string) -> i64 {
 	return i64(info.modification_time._nsec)
 }
 
-run_check :: proc(exercise: tutor_exercise.Exercise, entry_path: string) -> int {
+// check_once is build, trace, validate — and no printing at all.
+//
+// Split out so the one-shot `check` command and the student's loop share it.
+// Two implementations of "run this exercise" would drift, and the one the
+// student uses is the one that matters.
+check_once :: proc(
+	exercise: tutor_exercise.Exercise,
+	entry_path: string,
+) -> (
+	[]tutor_exercise.Result,
+	bool,
+) {
 	report, versions := examine(context.temp_allocator)
 	if report.failure != .None {
 		fmt.eprintln(tutor_preflight.explain(report.failure, context.temp_allocator))
-		return 1
+		return nil, false
 	}
 
 	built, build_failure := tutor_toolchain.build(entry_path, versions, context.temp_allocator)
@@ -486,7 +711,7 @@ run_check :: proc(exercise: tutor_exercise.Exercise, entry_path: string) -> int 
 			fmt.eprint(built.diagnostics)
 		}
 		fmt.eprintln(tutor_toolchain.explain(build_failure, context.temp_allocator))
-		return 1
+		return nil, false
 	}
 
 	work := strings.concatenate({built.executable, ".check"}, context.temp_allocator)
@@ -503,7 +728,7 @@ run_check :: proc(exercise: tutor_exercise.Exercise, entry_path: string) -> int 
 	)
 	if trace_failure != .None {
 		fmt.eprintln(tutor_toolchain.explain(trace_failure, context.temp_allocator))
-		return 1
+		return nil, false
 	}
 
 	observations, obs_err := os.read_entire_file(
@@ -512,28 +737,35 @@ run_check :: proc(exercise: tutor_exercise.Exercise, entry_path: string) -> int 
 	)
 	if obs_err != nil {
 		fmt.eprintln("OBSERVATIONS_MISSING: the adapter wrote nothing.")
-		return 1
+		return nil, false
 	}
 	stream, decode_err := tutor_obs.decode(observations)
 	if decode_err != .None {
 		fmt.eprintln("OBSERVATION_MALFORMED: the adapter's output is not valid JSON.")
-		return 1
+		return nil, false
 	}
 
 	assembly: tutor_model.Assembly
 	if tutor_model.assembly_init(&assembly) != nil {
 		fmt.eprintln("OUT_OF_MEMORY: could not reserve the assembly arena.")
-		return 1
+		return nil, false
 	}
 	defer tutor_model.assembly_destroy(&assembly)
 
 	trace, build_err := tutor_model.assemble(&assembly, stream)
 	if build_err != .None {
 		fmt.eprintln("BUDGET_DISAGREEMENT: the adapter reports different limits from this build.")
-		return 1
+		return nil, false
 	}
 
-	results := tutor_exercise.evaluate(exercise, trace, context.temp_allocator)
+	return tutor_exercise.evaluate(exercise, trace, context.temp_allocator), true
+}
+
+run_check :: proc(exercise: tutor_exercise.Exercise, entry_path: string) -> int {
+	results, ok := check_once(exercise, entry_path)
+	if !ok {
+		return 1
+	}
 
 	fmt.printfln("%s — %s", exercise.id, exercise.title)
 	fmt.println(exercise.objective)
