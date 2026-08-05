@@ -426,9 +426,66 @@ two_unrelated_buffers_do_not_share_storage :: proc(t: ^testing.T) {
 	trace, _ := assemble(&a, stream_of({{index = 0, line = 1, frames = {one_frame(vars)}}}))
 	entities, _ := materialise(trace, 0, context.temp_allocator)
 
-	testing.expect(
-		t,
-		entities[0].shares_storage_with != entities[1].shares_storage_with,
-		"buffers that do not overlap are not one storage",
-	)
+	// Neither carries a sharing mark at all. Sitting on a storage is not sharing
+	// it: each of these views is the only one on its buffer, so each shares with
+	// nobody.
+	//
+	// This assertion used to read `entities[0].shares_storage_with !=
+	// entities[1].shares_storage_with`, which passed for the wrong reason — the
+	// two views held two DIFFERENT storage identities, and both were shown to
+	// the student as "shares storage". The intent was always "these two are not
+	// one buffer"; the mechanism it checked stopped expressing it.
+	testing.expect_value(t, entities[0].shares_storage_with, NO_ID)
+	testing.expect_value(t, entities[1].shares_storage_with, NO_ID)
+}
+
+@(test)
+a_lone_view_is_never_marked_as_sharing :: proc(t: ^testing.T) {
+	// THE LIE THIS PREVENTS: "shares storage" on a slice that shares with
+	// nothing. Every slice in a program sits on a storage, so a mark set
+	// whenever a storage exists is a mark that is always on — and a student
+	// reads it as a relationship rather than as punctuation.
+	a: Assembly
+	assert(assembly_init(&a) == nil)
+	defer assembly_destroy(&a)
+
+	only := tutor_obs.Value {
+		state = .Valid, kind = .Slice, type_name = "[]int",
+		data = 0x1000, length = 3, elem_size = 8, address = 0xA,
+	}
+	vars := []tutor_obs.Variable{{name = "only", value = only}}
+	trace, _ := assemble(&a, stream_of({{index = 0, line = 1, frames = {one_frame(vars)}}}))
+	entities, _ := materialise(trace, 0, context.temp_allocator)
+
+	testing.expect_value(t, len(entities), 1)
+	testing.expect_value(t, entities[0].shares_storage_with, NO_ID)
+}
+
+@(test)
+two_empty_views_are_two_objects :: proc(t: ^testing.T) {
+	// THE LIE THIS PREVENTS: two empty slices become one object.
+	//
+	// Both are {data: 0x0, len: 0} and are byte-identical, so only the address
+	// of the variable holding each one separates them (SPEC-MEM-006). The
+	// adapter reports that under `address`; when it did not, both collapsed into
+	// a single identity and the student saw one variable where two existed.
+	a: Assembly
+	assert(assembly_init(&a) == nil)
+	defer assembly_destroy(&a)
+
+	first := tutor_obs.Value {
+		state = .Valid, kind = .Slice, type_name = "[]int", data = 0, length = 0, address = 0xA,
+	}
+	second := tutor_obs.Value {
+		state = .Valid, kind = .Slice, type_name = "[]int", data = 0, length = 0, address = 0xB,
+	}
+	vars := []tutor_obs.Variable {
+		{name = "empty1", value = first},
+		{name = "empty2", value = second},
+	}
+	trace, _ := assemble(&a, stream_of({{index = 0, line = 1, frames = {one_frame(vars)}}}))
+
+	slots := trace.steps[0].frames[0].slots
+	testing.expect_value(t, len(slots), 2)
+	testing.expect(t, slots[0].refers_to != slots[1].refers_to, "two empty slices are two objects")
 }

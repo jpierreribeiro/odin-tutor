@@ -231,6 +231,8 @@ build_step :: proc(
 		append(&frames, view)
 	}
 
+	mark_only_real_sharing(&current)
+
 	entities, removed := diff(a, current, keyframe)
 
 	return Step {
@@ -243,6 +245,39 @@ build_step :: proc(
 		removed     = removed,
 		stdout_len  = record.stdout_len,
 		truncations = truncations[:],
+	}
+}
+
+// mark_only_real_sharing clears the sharing mark on a view that is alone.
+//
+// `storage_for` names the storage every view sits on, because grouping by
+// overlap is how a sub-slice is recognised as a window onto its parent's buffer.
+// But sitting on a storage is not sharing it. A view that is the only one there
+// shares with nobody, and `shares_storage_with` is documented as naming the
+// storage "when it shares".
+//
+// Without this, every slice in the program carries a sharing mark, including two
+// lists with entirely separate buffers. The student reads "shares storage" and
+// learns a relationship that does not exist — the plausible-but-false picture
+// this project exists to prevent (ADR-008, SPEC-TUI-020).
+//
+// Sharing is decided here, in the model, and not in the renderer: the renderer
+// must not differ from the interface in content, so a fact only one of them
+// computes is a fact they can disagree about (ARCHITECTURE.md §2).
+mark_only_real_sharing :: proc(current: ^map[Id]Entity) {
+	occupants: map[Id]int
+	defer delete(occupants)
+
+	for _, entity in current {
+		if entity.shares_storage_with != NO_ID {
+			occupants[entity.shares_storage_with] += 1
+		}
+	}
+	for id, &entity in current {
+		if entity.shares_storage_with != NO_ID && occupants[entity.shares_storage_with] < 2 {
+			entity.shares_storage_with = NO_ID
+		}
+		_ = id
 	}
 }
 

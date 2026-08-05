@@ -62,6 +62,23 @@ def sane(length):
     return isinstance(length, int) and 0 <= length <= BUDGETS["sane_length"]
 
 
+def holder_address(value):
+    """Where the value's own header sits.
+
+    SPEC-MEM-006: two empty slices are byte-identical — both are
+    {data: 0x0, len: 0} — so nothing in their contents tells them apart. Only
+    the address of the variable holding each one does, and the core's identity
+    key expects it under `address`.
+
+    Omitting this collapses every empty view in a program into one object, which
+    is REQ-MEM-004 failing in the most visible way there is.
+    """
+    try:
+        return int(value.address) if value.address is not None else 0
+    except Exception:  # noqa: BLE001
+        return 0
+
+
 def read_string(value, type_name):
     """Read an Odin string, {data, len}, bounded."""
     try:
@@ -88,6 +105,7 @@ def read_string(value, type_name):
         "state": VALID, "kind": K_STRING, "type_name": type_name,
         "text": '"%s%s"' % (text, suffix),
         "length": length, "data": int(value["data"]) if value["data"] else 0,
+        "address": holder_address(value),
     }
 
 
@@ -107,6 +125,7 @@ def read_view(value, type_name, has_capacity):
         "type_name": type_name,
         "length": length,
         "data": data,
+        "address": holder_address(value),
     }
     try:
         # The element size lets the core decide whether two views overlap.
@@ -161,9 +180,13 @@ def read_value(value, depth=0):
             length = int(value["len"])
         except Exception as exc:
             return unknown(type_name, "map length not readable: %s" % exc)
+        # ADR-014: counted, not walked. The count is real and the entries are
+        # unknown. Decoding the layout by hand produces wrong pairs when it is
+        # wrong, and fails silently on a toolchain update.
         return {
             "state": UNKNOWN, "kind": K_MAP, "type_name": type_name,
             "length": length if sane(length) else 0,
+            "address": holder_address(value),
             "reason": "map entries are not readable through the debugger on this toolchain",
         }
 

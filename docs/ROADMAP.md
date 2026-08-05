@@ -245,7 +245,18 @@ benchmark at 100, 400, and 1600 steps.
 2. `cycle` terminates and shows the object's own identifier inside itself.
 3. `corrupt-length` yields `unknown`, and no read exceeds the bound. Asserted by
    instrumenting the adapter's read sizes, not by absence of a crash.
-4. `dangling-pointer` yields `unreadable` and the run completes.
+4. `invalid-pointer` yields `unreadable` and the run completes.
+   `dangling-pointer` yields an **ordinary value**, and the run completes.
+
+   > This criterion read "`dangling-pointer` yields `unreadable`" until
+   > 2026-08-05, when [R-21](RISKS.md#r-21) measured that it cannot. A freed
+   > region stays mapped and reads back as a plausible integer with no error.
+   > [TEST-STRATEGY.md](TEST-STRATEGY.md) §4 and the fixture were already
+   > corrected; this line was left behind, so a phase could have been accepted
+   > against a criterion the toolchain makes impossible.
+   >
+   > `invalid-pointer` is what actually exercises the `unreadable` path: a
+   > genuinely unmapped address raises a catchable `gdb.MemoryError`.
 5. Every fixture traced twice yields equal identities, with address
    randomisation left enabled.
 6. The growth-ratio benchmark shows linear assembly cost.
