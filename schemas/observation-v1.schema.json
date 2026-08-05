@@ -51,6 +51,19 @@
     },
     "exit_code": {
       "type": "integer"
+    },
+    "max_reads": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The largest single read the adapter performed, per kind. Instrumentation for SPEC-TEST-020: 'no read exceeded the bound' is asserted by what was read, not by the absence of a crash.",
+      "properties": {
+        "elements": {
+          "type": "integer"
+        },
+        "string_bytes": {
+          "type": "integer"
+        }
+      }
     }
   },
   "$defs": {

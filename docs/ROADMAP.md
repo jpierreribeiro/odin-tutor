@@ -196,6 +196,21 @@ the process launch.
 
 ## Phase 2 — The memory model
 
+> **Built 2026-08-05.** All eight acceptance criteria below are checked by
+> [`tests/phase2-acceptance.sh`](../tests/phase2-acceptance.sh): 17 checks, and
+> the core's own suite runs inside it.
+>
+> Four defects were found by tracing the anti-lie fixtures rather than by
+> reading code. Two empty slices collapsed into one identity. Every view in
+> every program carried a "shares storage" mark. `invalid-pointer` held a
+> `^int`, which SPEC-MEM-031 forbids following, so it tested nothing.
+> And the epoch machinery — the whole of ADR-011 — was reachable only from its
+> own tests, so the guard was inert and the test proving it was empty.
+>
+> One limit was measured and recorded rather than fixed:
+> [SPEC-TRACE-062](TRACE-SPEC.md#spec-trace-062). A program that reads freed
+> memory produces different VALUES on two runs while every identity holds.
+
 **Goal:** the picture. Identity, composites, pointers, and the states that say
 "I do not know".
 

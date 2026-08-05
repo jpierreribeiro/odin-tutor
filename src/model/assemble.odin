@@ -190,11 +190,29 @@ build_step :: proc(
 		if object.address == 0 {
 			continue
 		}
-		discovered[object.address] = identity_for(&a.registry, Key{
+		address := object.address
+		type_name := object.value.type_name
+
+		// The epoch is decided BEFORE the identity is minted, because it is part
+		// of the key. Both rules of SPEC-MEM-041 apply here and nowhere else.
+		//
+		// Rule 1: a different type at one address is positive evidence that the
+		// bytes are a different thing now.
+		if previous, found := a.registry.last_type[address]; found && previous != type_name {
+			advance_epoch_on_type_change(&a.registry, address, previous, type_name)
+		}
+		// Rule 2, with ADR-011's guard: absence counts as evidence of death only
+		// when every step it was absent for was observed COMPLETELY. A budget
+		// hid it is not the same fact as it died. `a.truncated` holds one entry
+		// per step already built, which is exactly the window to inspect.
+		advance_epoch_on_absence(&a.registry, address, type_name, index, a.truncated[:])
+		a.registry.last_type[address] = type_name
+
+		discovered[address] = identity_for(&a.registry, Key{
 			kind      = .Object,
-			address   = object.address,
-			type_name = object.value.type_name,
-			epoch     = epoch_for(&a.registry, object.address, object.value.type_name),
+			address   = address,
+			type_name = type_name,
+			epoch     = epoch_for(&a.registry, address, type_name),
 		})
 	}
 
@@ -329,7 +347,7 @@ slot_from_value :: proc(
 		// pointer's own text rather than inventing a target.
 		slot.text = variable.value.text
 	case:
-		entity, id := entity_from_value(a, variable.value)
+		entity, id := entity_from_value(a, variable.value, discovered, current, truncations)
 		slot.refers_to = id
 		if len(current) < a.config.objects_per_step {
 			current[id] = entity
@@ -377,6 +395,9 @@ mark_only_real_sharing :: proc(current: ^map[Id]Entity) {
 entity_from_value :: proc(
 	a: ^Assembly,
 	value: tutor_obs.Value,
+	discovered: map[u64]Id,
+	current: ^map[Id]Entity,
+	truncations: ^[dynamic]Truncation,
 ) -> (
 	entity: Entity,
 	id: Id,
@@ -403,6 +424,17 @@ entity_from_value :: proc(
 		type_name = value.type_name,
 		text      = value.text,
 		length    = value.length,
+	}
+	// A view's elements, which the adapter read bounded by the `elements` budget
+	// and only after the length passed validation. They are members of the view
+	// rather than objects of their own: an element is a position inside one
+	// storage, not a separate thing that could be shared.
+	if len(value.members) > 0 {
+		members := make([dynamic]Slot, a.allocator)
+		for member in value.members {
+			append(&members, slot_from_value(a, member, discovered, current, truncations))
+		}
+		entity.members = members[:]
 	}
 	if kind == .View && value.data != 0 {
 		// Two views over one buffer share a visible thing rather than being

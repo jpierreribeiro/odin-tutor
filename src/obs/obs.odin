@@ -137,6 +137,18 @@ Termination :: enum {
 	Adapter_Failed,
 }
 
+// Max_Reads is the largest single read the adapter performed, per kind.
+//
+// Instrumentation, not enforcement — the budgets already bound every read. It
+// exists so a test can assert "no read exceeded the bound" by looking at what
+// was READ. The absence of a crash proves nothing: reading thirty plausible
+// integers out of corrupt memory does not crash either, and that is the failure
+// being guarded against. See SPEC-TEST-020, SPEC-SAFE-010.
+Max_Reads :: struct {
+	elements:     int `json:"elements"`,
+	string_bytes: int `json:"string_bytes"`,
+}
+
 // Budgets are what the adapter says it enforced. The core cannot verify a
 // budget enforced at the read, so it compares this declaration with its own
 // configuration and reports a disagreement. See SPEC-SAFE-020 and ADR-006.
@@ -164,6 +176,8 @@ Stream :: struct {
 	detail:         string      `json:"detail,omitempty"`,
 	stdout:         string      `json:"stdout,omitempty"`,
 	exit_code:      int         `json:"exit_code"`,
+	// max_reads is what the adapter actually read, for SPEC-TEST-020.
+	max_reads: Max_Reads `json:"max_reads,omitempty"`,
 }
 
 // Decode_Error says why a stream could not be read. It is an enum rather than

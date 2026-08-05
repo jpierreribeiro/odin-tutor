@@ -187,9 +187,30 @@ assembly_cost_is_linear_in_steps :: proc(t: ^testing.T) {
 		return a.bytes_so_far, sum
 	}
 
-	for n in ([]int{100, 400, 1600}) {
+	sizes := []int{100, 400, 1600}
+	totals: [3]int
+	for n, i in sizes {
 		accumulated, summed := build(n)
+		// Nothing re-measures the whole document: the running total equals the
+		// sum of the per-step costs.
 		testing.expect_value(t, accumulated, summed)
+		totals[i] = accumulated
+	}
+
+	// The growth ratio itself. Four times the steps must cost about four times
+	// as much, not sixteen. ROADMAP Phase 2, acceptance 6.
+	//
+	// Checked as a ratio rather than as wall time so it cannot flake on a busy
+	// machine, and with a generous band because per-step size varies with the
+	// line number's digit count. Quadratic growth would land at 16x and is not
+	// close to the band's edge.
+	for i in 1 ..< len(sizes) {
+		ratio := f64(totals[i]) / f64(totals[i - 1])
+		testing.expect(
+			t,
+			ratio > 3.0 && ratio < 6.0,
+			"cost must grow with the step count, not with its square",
+		)
 	}
 }
 
@@ -557,4 +578,179 @@ an_unfollowed_pointer_refers_to_nothing :: proc(t: ^testing.T) {
 	slot := trace.steps[0].frames[0].slots[0]
 	testing.expect_value(t, slot.refers_to, NO_ID)
 	testing.expect_value(t, slot.text, "->")
+}
+
+@(test)
+free_then_allocate_reuses_the_identity_which_is_WRONG :: proc(t: ^testing.T) {
+	// ROADMAP Phase 2, acceptance 7. SPEC-TEST-021.
+	//
+	// This test asserts behaviour that is INCORRECT by REQ-MEM-003, on purpose.
+	//
+	// Version 1 has no allocation events, so it cannot tell reuse from
+	// continuity. An object freed and an object allocated at the same address
+	// with the same type are indistinguishable to a reader of memory, and the
+	// second inherits the first's identity. The student sees one object that
+	// changed value, where two objects lived and died.
+	//
+	// A known gap with a test is engineering. A known gap without one is a
+	// rumour. When Phase 6 closes this by observing the allocator, this test
+	// FAILS LOUDLY and is replaced rather than quietly deleted.
+	a: Assembly
+	assert(assembly_init(&a) == nil)
+	defer assembly_destroy(&a)
+
+	REUSED :: u64(0x5000)
+	holder :: u64(0xA)
+
+	// Step 0: the first object. Step 1: the second, at the same address. The
+	// adapter reached both, so both are complete observations - there is no
+	// truncation anywhere to excuse the collapse.
+	// Built inline rather than by a helper: Odin refuses to return a compound
+	// literal holding a slice, because the slice would point into the callee's
+	// frame. These live in this test's frame, which outlives the assembly call.
+	members_first := []tutor_obs.Variable {
+		{name = "value", value = {state = .Valid, kind = .Scalar, type_name = "int", text = "1"}},
+	}
+	members_second := []tutor_obs.Variable {
+		{name = "value", value = {state = .Valid, kind = .Scalar, type_name = "int", text = "2"}},
+	}
+	object_first := tutor_obs.Value {
+		state = .Valid, kind = .Struct, type_name = "main::Node", address = REUSED,
+		members = members_first,
+	}
+	object_second := tutor_obs.Value {
+		state = .Valid, kind = .Struct, type_name = "main::Node", address = REUSED,
+		members = members_second,
+	}
+	pointer := tutor_obs.Value {
+		state = .Valid, kind = .Pointer, type_name = "^Node", data = REUSED, address = holder,
+	}
+	vars := []tutor_obs.Variable{{name = "p", value = pointer}}
+
+	trace, _ := assemble(&a, stream_of({
+		{index = 0, line = 1, frames = {one_frame(vars)},
+		 objects = []tutor_obs.Discovered{{address = REUSED, value = object_first}}},
+		{index = 1, line = 2, frames = {one_frame(vars)},
+		 objects = []tutor_obs.Discovered{{address = REUSED, value = object_second}}},
+	}))
+
+	first := trace.steps[0].frames[0].slots[0].refers_to
+	second := trace.steps[1].frames[0].slots[0].refers_to
+
+	testing.expect(t, first != NO_ID, "both steps refer to an object")
+	testing.expect_value(t, first, second)
+	// ^ THE WRONG ANSWER. Two objects, one identity. When this line starts
+	//   failing, REQ-MEM-003 has been met and TRACEABILITY.md must say so.
+}
+
+@(test)
+a_truncated_step_does_not_break_an_identity :: proc(t: ^testing.T) {
+	// ROADMAP Phase 2, acceptance 8. SPEC-MEM-044, ADR-011.
+	//
+	// The object is present, then a budget hides it, then it is present again.
+	// It never died: the reachable set is a property of OUR traversal, not of
+	// the program, so absence under a budget is not evidence of death.
+	//
+	// If a budget could change an identity, then looking at a program would
+	// change what the program is - and the student would see an object
+	// replaced by a different one because the tool ran out of room.
+	a: Assembly
+	cfg := DEFAULT_CONFIG
+	cfg.objects_per_step = 1
+	assert(assembly_init(&a, cfg) == nil)
+	defer assembly_destroy(&a)
+
+	LIVE :: u64(0x6000)
+	OTHER :: u64(0x7000)
+
+	members := []tutor_obs.Variable {
+		{name = "v", value = {state = .Valid, kind = .Scalar, type_name = "int", text = "1"}},
+	}
+	live := tutor_obs.Discovered {
+		address = LIVE,
+		value = {
+			state = .Valid, kind = .Struct, type_name = "main::Node",
+			address = LIVE, members = members,
+		},
+	}
+	other := tutor_obs.Discovered {
+		address = OTHER,
+		value = {
+			state = .Valid, kind = .Struct, type_name = "main::Other",
+			address = OTHER, members = members,
+		},
+	}
+	pointer := tutor_obs.Value {
+		state = .Valid, kind = .Pointer, type_name = "^Node", data = LIVE, address = 0xA,
+	}
+	vars := []tutor_obs.Variable{{name = "p", value = pointer}}
+
+	// Step 1 offers two objects with a budget of one, so the step is truncated
+	// and the object that matters is the one that got cut.
+	trace, _ := assemble(&a, stream_of({
+		{index = 0, line = 1, frames = {one_frame(vars)}, objects = []tutor_obs.Discovered{live}},
+		{index = 1, line = 2, frames = {one_frame(vars)}, objects = []tutor_obs.Discovered{other, live}},
+		{index = 2, line = 3, frames = {one_frame(vars)}, objects = []tutor_obs.Discovered{live}},
+	}))
+
+	testing.expect(t, len(trace.steps[1].truncations) > 0, "step 1 must record that a budget cut it")
+
+	before := trace.steps[0].frames[0].slots[0].refers_to
+	after := trace.steps[2].frames[0].slots[0].refers_to
+	testing.expect(t, before != NO_ID, "the object has an identity to keep")
+	testing.expect_value(t, before, after)
+}
+
+@(test)
+a_complete_absence_does_change_the_identity_end_to_end :: proc(t: ^testing.T) {
+	// The companion to a_truncated_step_does_not_break_an_identity, and the
+	// reason that test means anything.
+	//
+	// If the epoch never advanced, the guard would be doing no work and the
+	// truncation test would pass while asserting nothing - the vacuous-check
+	// failure SPEC-TEST-022 was written against. That is not hypothetical here:
+	// the epoch procedures WERE only reachable from tests until this was wired,
+	// so the guard was provably inert and its test provably empty.
+	//
+	// Same three-step shape, one difference: nothing is truncated, so the
+	// absence at step 1 is a complete observation. The address then IS evidence
+	// of a new allocation, and the identity must change.
+	a: Assembly
+	assert(assembly_init(&a) == nil)   // the default budget cuts nothing
+	defer assembly_destroy(&a)
+
+	LIVE :: u64(0x6000)
+	members := []tutor_obs.Variable {
+		{name = "v", value = {state = .Valid, kind = .Scalar, type_name = "int", text = "1"}},
+	}
+	live := tutor_obs.Discovered {
+		address = LIVE,
+		value = {
+			state = .Valid, kind = .Struct, type_name = "main::Node",
+			address = LIVE, members = members,
+		},
+	}
+	pointer := tutor_obs.Value {
+		state = .Valid, kind = .Pointer, type_name = "^Node", data = LIVE, address = 0xA,
+	}
+	vars := []tutor_obs.Variable{{name = "p", value = pointer}}
+	// Step 1 has no objects at all, and no budget was reached.
+	empty := []tutor_obs.Variable{}
+
+	trace, _ := assemble(&a, stream_of({
+		{index = 0, line = 1, frames = {one_frame(vars)}, objects = []tutor_obs.Discovered{live}},
+		{index = 1, line = 2, frames = {one_frame(empty)}},
+		{index = 2, line = 3, frames = {one_frame(vars)}, objects = []tutor_obs.Discovered{live}},
+	}))
+
+	testing.expect_value(t, len(trace.steps[1].truncations), 0)
+
+	before := trace.steps[0].frames[0].slots[0].refers_to
+	after := trace.steps[2].frames[0].slots[0].refers_to
+	testing.expect(t, before != NO_ID && after != NO_ID, "both steps refer to an object")
+	testing.expect(
+		t,
+		before != after,
+		"an address that vanished from a complete observation and came back is a new object",
+	)
 }

@@ -383,6 +383,35 @@ from addresses.
 | Debugger version | Value formatting, symbol resolution | Pinned and checked; see [PLATFORM-SUPPORT.md](PLATFORM-SUPPORT.md) |
 | Program input, clock, randomness | Program behaviour differs | Out of scope. Exercises must be deterministic; the loader warns on obvious sources. |
 | Map iteration order in the target | Element order differs | Maps are not walked ([SPEC-MEM-052](MEMORY-MODEL.md#spec-mem-052)) |
+| **Reads of freed memory** | Shown VALUES differ between runs | Identities do not. Measured 2026-08-05; see below |
+
+<a id="spec-trace-062"></a>
+### SPEC-TRACE-062 — A read of freed memory is not deterministic, and its identity is
+
+**Measured 2026-08-05.** Tracing `linked-list-4` twice produced identical
+identity structure — every identity, every reference, every sharing relation,
+every length equal — and three differing values, at the three steps that run
+after its `free` calls. One run showed `5221563695381173885` where the other
+showed `-2978931840185788610`.
+
+This is not a defect in the model. A freed region stays mapped and reads back as
+whatever the allocator left there, which varies with the address layout
+([R-21](RISKS.md#r-21)). The tool is reporting the memory truthfully; the memory
+is what is unstable.
+
+**The consequence for testing.** A determinism check that compares whole traces
+byte for byte fails on any fixture whose program reads freed memory, and it fails
+for a reason that has nothing to do with identity. The check that matters — and
+the one [ROADMAP.md](ROADMAP.md) Phase 2 acceptance 5 states — compares
+**identities**. Byte equality is asserted separately, on the fixtures where it
+genuinely holds, so the stronger claim is still made where it is true rather than
+weakened everywhere.
+
+*Rationale for recording this at all:* Rule 6 states determinism without
+qualification, and an unqualified rule with a known exception is a rule the next
+agent discovers by being surprised. Phase 6 removes the exception by observing
+the allocator, at which point a freed object stops being read and this row can
+go.
 
 ---
 

@@ -53,6 +53,23 @@ def unreadable(type_name, reason):
     return {"state": UNREADABLE, "kind": K_OPAQUE, "type_name": type_name, "reason": reason}
 
 
+# The largest single read this run performed, per kind. Instrumentation, not
+# enforcement: the budgets below already bound every read. This exists so a test
+# can assert "no read exceeded the bound" by looking at what was READ, rather
+# than by observing that nothing crashed.
+#
+# SPEC-TEST-020 for corrupt-length asks for exactly that. The absence of a crash
+# proves nothing: reading thirty plausible integers out of corrupt memory does
+# not crash either, and that is the failure being guarded against.
+READS = {"elements": 0, "string_bytes": 0}
+
+
+def note_read(kind, count):
+    if count > READS[kind]:
+        READS[kind] = count
+    return count
+
+
 def sane(length):
     """A length from the target is checked before it drives anything.
 
@@ -91,7 +108,7 @@ def read_string(value, type_name):
         # corrupt memory hide the corruption the student is looking for.
         # See SPEC-SAFE-011.
         return unknown(type_name, "length %d is not a plausible length" % length)
-    take = min(length, BUDGETS["string_length"])
+    take = note_read("string_bytes", min(length, BUDGETS["string_length"]))
     try:
         data = value["data"]
         raw = bytes(int(data[i]) & 0xFF for i in range(take))
@@ -134,6 +151,31 @@ def read_view(value, type_name, has_capacity):
         out["elem_size"] = int(value["data"].type.target().sizeof)
     except Exception:
         pass
+
+    # The elements themselves, bounded by `elements` and only ever after the
+    # length passed validation above. The order is the whole safeguard: a length
+    # from a possibly-corrupt target must be checked BEFORE it sizes a read
+    # (SPEC-SAFE-010, REQ-SAFE-002).
+    #
+    # NOT min(length, budget) on an insane length. That reads thirty plausible
+    # integers out of whatever follows and hides the corruption the student is
+    # looking for (SPEC-SAFE-011, AGENT-GUIDE §6).
+    if data != 0 and length > 0:
+        take = note_read("elements", min(length, BUDGETS["elements"]))
+        elements = []
+        try:
+            for i in range(take):
+                elements.append(read_value(value["data"][i], depth=1))
+        except gdb.MemoryError as exc:
+            return unreadable(type_name, str(exc))
+        except Exception:  # noqa: BLE001
+            elements = []
+        if elements:
+            out["members"] = [
+                {"name": "[%d]" % i, "value": element}
+                for i, element in enumerate(elements)
+            ]
+            out["truncated"] = length > take
     if has_capacity:
         try:
             out["capacity"] = int(value["cap"])
@@ -544,6 +586,7 @@ def emit(run, stdout_text, exit_code):
         "debugger": gdb.VERSION if hasattr(gdb, "VERSION") else "gdb",
         "source_file": os.path.basename(SOURCE),
         "budgets": BUDGETS,
+        "max_reads": dict(READS),
         "records": run.records,
         "termination": run.termination,
         "detail": run.detail,
@@ -557,6 +600,16 @@ def emit(run, stdout_text, exit_code):
 def main():
     gdb.execute("set confirm off")
     gdb.execute("set pagination off")
+    # gdb disables address randomisation by default, to make a debugging session
+    # repeatable. Here that would be a lie by omission: the tool claims the trace
+    # is deterministic BECAUSE identity is a counter over a deterministic
+    # traversal and never an address (SPEC-MEM-001, Rule 6). With randomisation
+    # off, that claim would hold for a reason it does not actually rely on, and
+    # the test proving it would be vacuous.
+    #
+    # Left on, the observation streams of two runs differ - they carry addresses -
+    # while the traces are byte-identical. That difference is the proof.
+    gdb.execute("set disable-randomization off")
 
     run = Run()
     gdb.events.new_thread.connect(run.on_new_thread)

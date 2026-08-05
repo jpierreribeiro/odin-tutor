@@ -10,27 +10,47 @@ stack, the variables, and the object graph at each step.
 
 ## Status
 
-**Phases 0 and 1 complete.** One command takes a `.odin` file to a rendered
-step. `./check.sh` passes — `-vet -strict-style` clean, 42 tests across five
-packages, both JSON schemas validating the real adapter output — and all six of
-Phase 1's acceptance criteria are checked by a script anyone can run.
+**Phases 0, 1 and 2 complete.** One command takes a `.odin` file to a rendered
+step, and the picture it draws is the memory model: identities that are never
+addresses, sub-slices shown as windows onto one buffer, pointers resolved to
+references, cycles that show their own identifier. `./check.sh` passes —
+`-vet -strict-style` clean, 49 tests across five packages, both JSON schemas
+validating the real adapter output — and every acceptance criterion of Phases 1
+and 2 is checked by a script anyone can run.
 
 ```sh
 export ODIN_ROOT=/path/to/Odin        # core: imports fail without it
 ./check.sh                            # is the code correct?
 ./probes/run.sh                       # does this toolchain work?
 ./tests/phase1-acceptance.sh          # is the phase done?
+./tests/phase2-acceptance.sh
 
 ./odin-tutor trace fixtures/programs/sub-slice.odin trace.json
-./odin-tutor render trace.json 3
+./odin-tutor render trace.json 4
 ```
+
+```
+OBJECTS
+  #2 struct []int (3)  [shares storage @3]
+      [0] = 7
+      [1] = 8
+      [2] = 9
+  #4 struct []int (2)  [shares storage @3]
+      [0] = 8
+      [1] = 9
+```
+
+Two views, one buffer. `#2` and `#4` are identities, not addresses — trace the
+same program again with address randomisation on and they are the same two
+numbers.
 
 `trace` runs preflight, compiles with a cache keyed by source **and** Odin
 version, drives gdb, records the observation stream beside the trace, and
 assembles it. The recorded stream replays to a byte-identical trace with gdb
 uninstalled, which is what makes every later phase testable in milliseconds.
 
-Not built yet: the interactive step player, the validator, and the exercises.
+Not built yet: frame identity under recursion and return values (Phase 3), the
+interactive step player (Phase 4), the validator and the exercises (Phase 5).
 See [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 Read [`docs/PROJECT.md`](docs/PROJECT.md) first, then

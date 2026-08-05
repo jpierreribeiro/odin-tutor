@@ -52,6 +52,10 @@ Registry :: struct {
 	// last_seen records the step index at which an address was last in the
 	// reachable set.
 	last_seen: map[Epoch_Key]int,
+	// last_type records the type last seen at an address. A different type at
+	// one address is positive evidence: the bytes there are a different thing
+	// now. See SPEC-MEM-041 rule 1.
+	last_type: map[u64]string,
 	next:     Id,
 }
 
@@ -64,6 +68,7 @@ registry_init :: proc(r: ^Registry, allocator := context.allocator) {
 	r.assigned = make(map[Key]Id, allocator)
 	r.epochs = make(map[Epoch_Key]int, allocator)
 	r.last_seen = make(map[Epoch_Key]int, allocator)
+	r.last_type = make(map[u64]string, allocator)
 	r.next = 1
 }
 
@@ -71,6 +76,7 @@ registry_destroy :: proc(r: ^Registry) {
 	delete(r.assigned)
 	delete(r.epochs)
 	delete(r.last_seen)
+	delete(r.last_type)
 }
 
 // identity_for returns the identity of an entity, assigning one if this is
