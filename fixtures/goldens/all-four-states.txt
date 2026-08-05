@@ -1,0 +1,16 @@
+STEP 6/10   all-four-states.odin:30   main::main
+
+FRAMES
+  main::main()
+    shown = 7
+    unmapped -> [4]
+    corrupted ? unknown (length 4000000000 is not a plausible length)
+    length_field = ->
+    later - not yet (declared at line 31, not reached yet)
+
+OBJECTS
+  [4] struct main::Node
+      value ! unreadable (Cannot access memory at address 0xdeadbeef)
+      next ! unreadable (Cannot access memory at address 0xdeadbef7)
+
+OUTPUT SO FAR: 0 bytes

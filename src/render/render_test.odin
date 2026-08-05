@@ -29,9 +29,9 @@ a_golden_shows_all_four_states_at_once :: proc(t: ^testing.T) {
 	out := step(trace, 0, {}, PLAIN, context.temp_allocator)
 
 	testing.expect(t, strings.contains(out, "total = 24"), "a valid value shows its value")
-	testing.expect(t, strings.contains(out, "later (not created yet)"), "not-yet-active has its own words")
-	testing.expect(t, strings.contains(out, "gone (could not be read)"), "unreadable has its own words")
-	testing.expect(t, strings.contains(out, "corrupt (unknown)"), "unknown has its own words")
+	testing.expect(t, strings.contains(out, "later - not yet"), "not-yet-active has its own words")
+	testing.expect(t, strings.contains(out, "gone ! unreadable"), "unreadable has its own words")
+	testing.expect(t, strings.contains(out, "corrupt ? unknown"), "unknown has its own words")
 	testing.expect(t, strings.contains(out, "length failed validation"), "the reason reaches the student")
 }
 
@@ -39,7 +39,7 @@ a_golden_shows_all_four_states_at_once :: proc(t: ^testing.T) {
 the_four_state_marks_are_all_different :: proc(t: ^testing.T) {
 	seen := make(map[string]bool, context.temp_allocator)
 	for state in tutor_model.Value_State {
-		mark := state_mark(state)
+		mark := state_mark(state, PLAIN)
 		testing.expect(t, !(mark in seen), "two states must never share a visible form")
 		seen[mark] = true
 	}
@@ -53,8 +53,12 @@ an_empty_frame_does_not_claim_there_are_no_variables :: proc(t: ^testing.T) {
 		steps = {{index = 0, file = "m.odin", line = 3, frames = {{id = 1, procedure = "fib", line = 3}}}},
 	}
 	out := step(trace, 0, {}, PLAIN, context.temp_allocator)
-	testing.expect(t, strings.contains(out, "no variables in scope at this line"), "say what is true")
-	testing.expect(t, !strings.contains(out, "has no variables"), "do not claim the procedure has none")
+	testing.expect(t, strings.contains(out, "(no variables)"), "say what is true")
+	// SPEC-TUI-011: "(no variables)" is the `none` case and is correct here -
+	// the frame really has no slots. The case that must never be silent is a
+	// frame WITH slots that are not readable yet, and each of those prints its
+	// own state mark rather than being omitted.
+	testing.expect(t, !strings.contains(out, "not yet"), "an empty frame has nothing to withhold")
 }
 
 @(test)
@@ -77,8 +81,8 @@ aliasing_shows_as_two_slots_with_one_label :: proc(t: ^testing.T) {
 		},
 	}
 	out := step(trace, 0, {{id = 7, kind = .View, type_name = "[]int", length = 3}}, PLAIN, context.temp_allocator)
-	testing.expect(t, strings.contains(out, "xs -> #7"), "the first name carries the label")
-	testing.expect(t, strings.contains(out, "ys -> #7"), "and so does the second")
+	testing.expect(t, strings.contains(out, "xs -> [7]"), "the first name carries the label")
+	testing.expect(t, strings.contains(out, "ys -> [7]"), "and so does the second")
 }
 
 @(test)
@@ -93,9 +97,9 @@ shared_storage_is_marked_differently_from_aliasing :: proc(t: ^testing.T) {
 	trace := tutor_model.Trace{steps = {{index = 0, file = "m.odin", line = 5, keyframe = true}}}
 	out := step(trace, 0, entities, PLAIN, context.temp_allocator)
 
-	testing.expect(t, strings.contains(out, "#7 []int (3)"), "the parent keeps its own length")
-	testing.expect(t, strings.contains(out, "#8 []int (2)"), "and the sub-slice keeps its own")
-	testing.expect(t, strings.contains(out, "shares storage @9"), "sharing is stated, not implied")
+	testing.expect(t, strings.contains(out, "[7] []int (3)"), "the parent keeps its own length")
+	testing.expect(t, strings.contains(out, "[8] []int (2)"), "and the sub-slice keeps its own")
+	testing.expect(t, strings.contains(out, "shares with [8]"), "sharing is stated in words, and names the other view")
 }
 
 @(test)

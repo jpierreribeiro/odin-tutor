@@ -7,13 +7,17 @@ package tutor_cli
 
 import "core:fmt"
 import "core:os"
+import "core:slice"
 import "core:strconv"
+import "core:time"
+import "core:path/filepath"
 import "core:strings"
 import tutor_model "../model"
 import tutor_obs "../obs"
 import tutor_preflight "../preflight"
 import tutor_render "../render"
 import tutor_toolchain "../toolchain"
+import tutor_tui "../tui"
 
 USAGE :: `odin-tutor — see what your Odin program does to memory
 
@@ -28,8 +32,19 @@ USAGE :: `odin-tutor — see what your Odin program does to memory
   odin-tutor assemble <observations.json> <trace.json>
       Turn an adapter's observation stream into a trace.
 
-  odin-tutor render <trace.json> [step]
+  odin-tutor play <trace.json> [--ascii] [--no-colour]
+      Step through the trace. Arrow keys move, g jumps, q quits.
+      Nothing is re-run: the trace is read, never the program.
+
+  odin-tutor render <trace.json> [step] [--unicode]
       Print one step. Step numbers start at 1. Default is 1.
+      The same information as the interactive screen, as plain text.
+      --unicode uses the same glyphs the screen does, and loses nothing
+      without it.
+
+  odin-tutor bench <trace.json>
+      Measure navigation: how long materialising each step takes.
+      SPEC-PERF-010 requires under 16 ms at the 99th percentile.
 
   odin-tutor version
 
@@ -59,21 +74,52 @@ main :: proc() {
 			os.exit(2)
 		}
 		os.exit(cmd_assemble(args[1], args[2]))
+	case "play":
+		if len(args) < 2 {
+			fmt.eprintln("play needs a trace path")
+			os.exit(2)
+		}
+		style := tutor_render.FANCY
+		for flag in args[2:] {
+			switch flag {
+			case "--ascii":
+				style.unicode = false
+			case "--no-colour", "--no-color":
+				style.colour = false
+			case:
+				fmt.eprintfln("unknown option: %s", flag)
+				os.exit(2)
+			}
+		}
+		os.exit(cmd_play(args[1], style))
 	case "render":
 		if len(args) < 2 {
 			fmt.eprintln("render needs a trace path")
 			os.exit(2)
 		}
 		index := 1
-		if len(args) >= 3 {
-			parsed, parse_ok := strconv.parse_int(args[2])
+		// PLAIN by default: a golden is read by a test and pasted into a bug
+		// report, and both want no escape sequences (SPEC-TUI-050).
+		style := tutor_render.PLAIN
+		for argument in args[2:] {
+			if argument == "--unicode" {
+				style.unicode = true
+				continue
+			}
+			parsed, parse_ok := strconv.parse_int(argument)
 			if !parse_ok || parsed < 1 {
 				fmt.eprintln("BAD_STEP: the step must be a positive whole number.")
 				os.exit(2)
 			}
 			index = parsed
 		}
-		os.exit(cmd_render(args[1], index))
+		os.exit(cmd_render(args[1], index, style))
+	case "bench":
+		if len(args) != 2 {
+			fmt.eprintln("bench needs a trace path")
+			os.exit(2)
+		}
+		os.exit(cmd_bench(args[1]))
 	case "version":
 		fmt.printfln("odin-tutor (planning skeleton), trace format v%d, observation format v%d",
 			tutor_model.TRACE_VERSION, tutor_obs.SCHEMA_VERSION)
@@ -271,7 +317,126 @@ cmd_assemble :: proc(input_path, output_path: string) -> int {
 	return 0
 }
 
-cmd_render :: proc(trace_path: string, step_number: int) -> int {
+// source_beside finds the student's source next to the trace, for the CODE
+// region.
+//
+// Missing source is not missing information about memory, so a trace whose
+// program has moved still plays: the other three regions are drawn and the
+// student is not stopped. See SPEC-TUI-043 for the same principle under width.
+source_beside :: proc(trace: tutor_model.Trace, trace_path: string, allocator := context.allocator) -> []string {
+	if trace.source_file == "" {
+		return nil
+	}
+	// NOT deleted. `filepath.dir` returns a SLICE OF ITS INPUT — it calls
+	// split_path and hands back a substring, allocating nothing. Freeing it
+	// frees a pointer the caller owns, and when the caller is argv that is a
+	// pointer into the stack. This segfaulted before it was read.
+	directory := filepath.dir(trace_path)
+	beside, join_err := filepath.join({directory, trace.source_file}, context.temp_allocator)
+	if join_err != nil {
+		beside = trace.source_file
+	}
+	for candidate in ([]string{beside, trace.source_file}) {
+		data, err := os.read_entire_file(candidate, allocator)
+		if err == nil {
+			return strings.split_lines(string(data), allocator)
+		}
+	}
+	return nil
+}
+
+cmd_play :: proc(trace_path: string, style: tutor_render.Style) -> int {
+	data, read_err := os.read_entire_file(trace_path, context.allocator)
+	if read_err != nil {
+		fmt.eprintfln("INPUT_UNREADABLE: could not read %s", trace_path)
+		return 1
+	}
+	defer delete(data)
+
+	trace, ok := tutor_model.decode(data)
+	if !ok {
+		fmt.eprintfln(
+			"TRACE_VERSION: this build reads trace format v%d, and the file is a different version.",
+			tutor_model.TRACE_VERSION,
+		)
+		return 1
+	}
+	source := source_beside(trace, trace_path, context.temp_allocator)
+	return tutor_tui.run(trace, source, style)
+}
+
+// cmd_bench measures what navigation actually costs.
+//
+// SPEC-PERF-032: a performance claim is backed by a recorded number, not by an
+// intuition. This exists so the 16 ms in SPEC-PERF-010 is checkable by anyone
+// on their own machine and their own largest trace, rather than asserted here.
+//
+// It measures MATERIALISATION, which is the whole cost of moving to a step:
+// applying at most K-1 deltas to a keyframe. Nothing is re-run, and that is the
+// property being measured — a navigation that compiled or executed anything
+// could not meet this budget at all.
+cmd_bench :: proc(trace_path: string) -> int {
+	data, read_err := os.read_entire_file(trace_path, context.allocator)
+	if read_err != nil {
+		fmt.eprintfln("INPUT_UNREADABLE: could not read %s", trace_path)
+		return 1
+	}
+	defer delete(data)
+
+	trace, ok := tutor_model.decode(data)
+	if !ok {
+		fmt.eprintln("TRACE_VERSION: this build reads a different trace format.")
+		return 1
+	}
+	if len(trace.steps) == 0 {
+		fmt.eprintln("The trace has no steps.")
+		return 1
+	}
+
+	samples := make([]f64, len(trace.steps), context.allocator)
+	defer delete(samples)
+
+	// Every step, in a shuffled-in-effect order: the worst case for a keyframe
+	// scheme is a jump, not a walk, so measuring only sequential steps would
+	// measure the easy case. Going backwards from the end does that without
+	// needing randomness, which the trace format forbids anyway.
+	for i in 0 ..< len(trace.steps) {
+		index := len(trace.steps) - 1 - i
+		started := time.now()
+		entities, materialise_ok := tutor_model.materialise(trace, index, context.temp_allocator)
+		elapsed := time.duration_milliseconds(time.since(started))
+		if !materialise_ok {
+			fmt.eprintfln("TRACE_CORRUPT: step %d could not be reconstructed.", index + 1)
+			return 1
+		}
+		_ = entities
+		samples[i] = elapsed
+		free_all(context.temp_allocator)
+	}
+
+	slice.sort(samples)
+	total := 0.0
+	for s in samples {
+		total += s
+	}
+	p99 := samples[min(len(samples) - 1, int(f64(len(samples)) * 0.99))]
+
+	fmt.printfln("steps          %d", len(trace.steps))
+	fmt.printfln("keyframe every %d", trace.keyframe_interval)
+	fmt.printfln("min            %.4f ms", samples[0])
+	fmt.printfln("mean           %.4f ms", total / f64(len(samples)))
+	fmt.printfln("p99            %.4f ms", p99)
+	fmt.printfln("max            %.4f ms", samples[len(samples) - 1])
+	fmt.println()
+	if p99 < 16.0 {
+		fmt.printfln("SPEC-PERF-010 met: %.4f ms at the 99th percentile, under 16 ms.", p99)
+		return 0
+	}
+	fmt.printfln("SPEC-PERF-010 NOT met: %.4f ms at the 99th percentile.", p99)
+	return 1
+}
+
+cmd_render :: proc(trace_path: string, step_number: int, style := tutor_render.PLAIN) -> int {
 	data, read_err := os.read_entire_file(trace_path, context.allocator)
 	if read_err != nil {
 		fmt.eprintfln("INPUT_UNREADABLE: could not read %s", trace_path)
@@ -308,7 +473,7 @@ cmd_render :: proc(trace_path: string, step_number: int) -> int {
 	}
 	defer delete(entities)
 
-	fmt.print(tutor_render.step(trace, index, entities, tutor_render.PLAIN, context.temp_allocator))
+	fmt.print(tutor_render.step(trace, index, entities, style, context.temp_allocator))
 
 	if index == len(trace.steps) - 1 {
 		fmt.println()
