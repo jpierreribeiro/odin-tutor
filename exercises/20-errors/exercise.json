@@ -1,0 +1,36 @@
+{
+  "id": "20-errors",
+  "title": "An error is a second return value",
+  "objective": "Show that Odin reports failure by returning it, so the caller holds both the result and whether it is real.",
+  "concepts": [
+    "procedure",
+    "return",
+    "conditional"
+  ],
+  "difficulty": 3,
+  "requires": [
+    "07-frames"
+  ],
+  "entry": "start.odin",
+  "assertions": [
+    {
+      "id": "A1",
+      "at": "any",
+      "expr": "value_of(\"ok\") == \"false\""
+    },
+    {
+      "id": "A2",
+      "at": "any",
+      "expr": "value_of(\"result\") == \"0\""
+    },
+    {
+      "id": "A3",
+      "at": "final",
+      "expr": "output_equals(\"cannot divide by zero\\n\")"
+    }
+  ],
+  "hints": [
+    "hints.md"
+  ],
+  "expected_wall_ms": 3000
+}

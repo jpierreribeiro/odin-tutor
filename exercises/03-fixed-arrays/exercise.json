@@ -1,0 +1,31 @@
+{
+  "id": "03-fixed-arrays",
+  "title": "A fixed array carries its length in its type",
+  "objective": "Show that a fixed array is not a slice: its length is part of what it is, not a number stored beside it.",
+  "concepts": [
+    "array",
+    "slice",
+    "length"
+  ],
+  "difficulty": 2,
+  "requires": [
+    "01-values"
+  ],
+  "entry": "start.odin",
+  "assertions": [
+    {
+      "id": "A1",
+      "at": "any",
+      "expr": "type_of(\"marks\") == \"int [4]\""
+    },
+    {
+      "id": "A2",
+      "at": "final",
+      "expr": "output_equals(\"[7, 8, 9, 10]\\n\")"
+    }
+  ],
+  "hints": [
+    "hints.md"
+  ],
+  "expected_wall_ms": 3000
+}
