@@ -1,0 +1,35 @@
+{
+  "id": "04-structs",
+  "title": "Fields are named slots",
+  "objective": "Show that a struct groups values under names, and that the picture reads them individually.",
+  "concepts": [
+    "struct",
+    "field"
+  ],
+  "difficulty": 2,
+  "requires": [
+    "01-values"
+  ],
+  "entry": "start.odin",
+  "assertions": [
+    {
+      "id": "A1",
+      "at": "any",
+      "expr": "field_count(\"student\") == 2"
+    },
+    {
+      "id": "A2",
+      "at": "any",
+      "expr": "value_of(\"student.age\") == \"20\""
+    },
+    {
+      "id": "A3",
+      "at": "final",
+      "expr": "output_equals(\"Ana 20\\n\")"
+    }
+  ],
+  "hints": [
+    "hints.md"
+  ],
+  "expected_wall_ms": 3000
+}

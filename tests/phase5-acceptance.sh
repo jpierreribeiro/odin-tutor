@@ -220,7 +220,7 @@ rm -rf "$XDG_STATE_HOME"
 
 # 1. A bare invocation is the student's command, not a usage error.
 if "$tool" list > "$work/list.txt" 2>&1; then
-	if grep -q 'of 9 finished' "$work/list.txt"; then
+	if grep -qE '0 of [0-9]+ finished' "$work/list.txt"; then
 		ok "list shows every exercise with done and not-done"
 	else
 		bad "list did not report progress" "$(head -4 "$work/list.txt")"
@@ -241,14 +241,14 @@ if "$tool" list 2>&1 | grep -q 'done  01-values'; then
 else
 	bad "progress was not read back"
 fi
-if "$tool" list 2>&1 | grep -q '1 of 9 finished'; then
+if "$tool" list 2>&1 | grep -qE '1 of [0-9]+ finished'; then
 	ok "and the count reflects it"
 else
 	bad "the finished count did not move"
 fi
 
 # 3. The next exercise is chosen FOR the student.
-if "$tool" hint 2>&1 | grep -q "takes the address of a counter"; then
+if "$tool" hint 2>&1 | grep -q "runs the body four times"; then
 	ok "hint answers for the exercise the student is on, unnamed"
 else
 	bad "hint did not pick up the current exercise" \

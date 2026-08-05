@@ -1,0 +1,36 @@
+{
+  "id": "02-control-flow",
+  "title": "A loop you can step backwards through",
+  "objective": "Show that a loop runs its body once per iteration, with a counter you can watch change.",
+  "concepts": [
+    "loop",
+    "iteration",
+    "variable"
+  ],
+  "difficulty": 1,
+  "requires": [
+    "01-values"
+  ],
+  "entry": "start.odin",
+  "assertions": [
+    {
+      "id": "A1",
+      "at": "any",
+      "expr": "state_of(\"i\") == \"valid\""
+    },
+    {
+      "id": "A2",
+      "at": "any",
+      "expr": "value_of(\"total\") == \"10\""
+    },
+    {
+      "id": "A3",
+      "at": "final",
+      "expr": "output_equals(\"10\\n\")"
+    }
+  ],
+  "hints": [
+    "hints.md"
+  ],
+  "expected_wall_ms": 3000
+}

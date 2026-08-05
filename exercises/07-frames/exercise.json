@@ -1,0 +1,32 @@
+{
+  "id": "07-frames",
+  "title": "A call gets its own frame",
+  "objective": "Show that calling a procedure creates a frame with its own variables, and that it returns a value to the caller.",
+  "concepts": [
+    "procedure",
+    "parameter",
+    "return",
+    "frame"
+  ],
+  "difficulty": 2,
+  "requires": [
+    "01-values"
+  ],
+  "entry": "start.odin",
+  "assertions": [
+    {
+      "id": "A1",
+      "at": "on_return_of(\"add\")",
+      "expr": "returns(\"add\", \"7\")"
+    },
+    {
+      "id": "A2",
+      "at": "final",
+      "expr": "output_equals(\"7\\n\")"
+    }
+  ],
+  "hints": [
+    "hints.md"
+  ],
+  "expected_wall_ms": 3000
+}

@@ -293,17 +293,32 @@ cmd_trace :: proc(source_path, trace_path: string) -> int {
 
 // adapter_location finds the extractor.
 //
-// TUTOR_ADAPTER so a test can point at a copy, otherwise the repository layout.
-// Both are named paths. The adapter is NOT searched for in the working
-// directory: an adapter found that way is an adapter an exercise could replace,
-// and it runs inside the debugger (SPEC-SAFE-040).
+// Three NAMED places, tried in order, and the working directory is not one of
+// them. An adapter found by searching where the student happens to be standing
+// is an adapter an exercise could replace — and it runs inside the debugger
+// (SPEC-SAFE-040).
 //
-// This is the version 1 answer and it assumes the tool runs from the repository
-// root. An installed build needs a real install path, which is a packaging
-// decision this project has not made.
+//   1. TUTOR_ADAPTER, so a test can point at a copy and so a packager can
+//      override without patching the binary.
+//   2. Beside the executable, which is where an installed build puts it.
+//   3. The repository layout, which is where a contributor runs from.
+//
+// The order matters: an installed copy must win over a repository checkout that
+// happens to be the working directory, or a student with the source cloned gets
+// a different adapter from the one they installed.
 adapter_location :: proc(allocator := context.allocator) -> string {
 	if from_env := os.get_env("TUTOR_ADAPTER", context.temp_allocator); from_env != "" {
 		return strings.clone(from_env, allocator)
+	}
+
+	if len(os.args) > 0 {
+		beside := filepath.dir(os.args[0])
+		for relative in ([]string{"gdb_extractor.py", "adapter/gdb_extractor.py"}) {
+			candidate, err := filepath.join({beside, relative}, context.temp_allocator)
+			if err == nil && os.exists(candidate) {
+				return strings.clone(candidate, allocator)
+			}
+		}
 	}
 	return strings.clone("adapter/gdb_extractor.py", allocator)
 }

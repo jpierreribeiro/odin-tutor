@@ -428,10 +428,11 @@ frame panel incomplete.
 > `list`, `hint` — and the acceptance script gained a section for it so the same
 > gap cannot reopen silently.
 >
-> **Nine exercises**, on the curriculum's own ids: `01-values`, `05-pointers`,
-> `06-aliasing`, `08-recursion`, `10-new-and-free`, `12-slices`,
-> `13-sub-slices`, `14-dynamic-arrays`, `16-utf8`. Every one accepts its
-> reference solution, rejects a plausible wrong one, and has a hint.
+> **Twelve exercises**, on the curriculum's own ids: `01-values`, `02-control-flow`,
+> `04-structs`, `05-pointers`, `06-aliasing`, `07-frames`, `08-recursion`,
+> `10-new-and-free`, `12-slices`, `13-sub-slices`, `14-dynamic-arrays`,
+> `16-utf8`. Every one accepts its reference solution, rejects a plausible wrong
+> one, and has a hint.
 >
 > Three of them accepted their wrong solution when first written, and the
 > acceptance script caught all three. `08-recursion` needed the loop and the
