@@ -209,6 +209,11 @@ Nothing here touches the network. Compiled binaries are cached under
 `$XDG_CACHE_HOME/odin-tutor`; nothing else is written outside the paths you
 name.
 
+## License
+
+MIT. See [LICENSE](LICENSE). The exercises and their solutions are covered by
+it too — copy them into a course of your own if you are teaching someone.
+
 ## Contributing
 
 ```sh
