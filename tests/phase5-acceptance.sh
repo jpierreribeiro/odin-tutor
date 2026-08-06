@@ -330,6 +330,53 @@ else
 	fi
 fi
 
+# 1b. The command init tells the student to run has to BE A COMMAND.
+#
+# It printed `odin-tutor`, which is `command not found` for everyone who built
+# this from a checkout — the next line of their session, every time.
+runnable=$(grep -A2 '^  cd ' "$work/init.txt" | sed -n '2p' | sed 's/^  //')
+if [ -x "$runnable" ] || command -v "$runnable" > /dev/null 2>&1; then
+	ok "init prints a command that exists on the machine it printed it on"
+else
+	bad "init told the student to run something that is not there: '$runnable'" \
+		"$(sed -n '/^  cd /,+3p' "$work/init.txt")"
+fi
+
+# 1c. AN INSTALLED COPY, reached through the PATH.
+#
+# This is what the README tells a student to set up, and until this check it was
+# broken: found through the PATH, argv[0] is the bare word `odin-tutor`, so
+# everything looked for "beside the executable" was looked for beside whatever
+# directory the student was standing in. `init` found no course to copy, and a
+# trace found no script to run inside gdb.
+#
+# The environment variables that name both are UNSET here on purpose. They are
+# how the rest of this script points at a checkout, and they would hide exactly
+# the bug this checks for.
+installed="$work/bin"
+mkdir -p "$installed/adapter"
+cp "$tool" "$installed/odin-tutor"
+cp adapter/gdb_extractor.py "$installed/adapter/"
+cp -r exercises "$installed/"
+find "$installed/exercises" -name 'wrong-*.odin' -delete
+
+(cd "$work" && env -u TUTOR_EXERCISES -u TUTOR_ADAPTER PATH="$installed:$PATH" \
+	odin-tutor init from-path) > "$work/from-path.txt" 2>&1 || true
+if [ -f "$work/from-path/exercises/01-values/start.odin" ]; then
+	ok "an installed copy on the PATH finds its own exercises"
+else
+	bad "init from a PATH install found no course" "$(head -3 "$work/from-path.txt")"
+fi
+
+# And the debugger script too, which is the half that fails later and louder.
+(cd "$work/from-path" && env -u TUTOR_EXERCISES -u TUTOR_ADAPTER PATH="$installed:$PATH" \
+	odin-tutor check exercises/01-values --entry solution.odin) > "$work/from-path-trace.txt" 2>&1 || true
+if grep -q 'Done. Every assertion passed' "$work/from-path-trace.txt"; then
+	ok "and it traces, so it found its adapter beside itself rather than beside the student"
+else
+	bad "a PATH install could not trace" "$(tail -3 "$work/from-path-trace.txt")"
+fi
+
 # 2. The tool run from inside that directory works on THAT course.
 (cd "$student/mine/exercises/01-values" && "$tool" list) > "$work/inside.txt" 2>&1 || true
 if grep -qE "0 of $declared finished" "$work/inside.txt"; then

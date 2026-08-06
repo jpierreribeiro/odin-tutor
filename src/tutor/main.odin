@@ -324,8 +324,7 @@ adapter_location :: proc(allocator := context.allocator) -> string {
 		return strings.clone(from_env, allocator)
 	}
 
-	if len(os.args) > 0 {
-		beside := filepath.dir(os.args[0])
+	if beside := executable_directory(context.temp_allocator); beside != "" {
 		for relative in ([]string{"gdb_extractor.py", "adapter/gdb_extractor.py"}) {
 			candidate, err := filepath.join({beside, relative}, context.temp_allocator)
 			if err == nil && os.exists(candidate) {
@@ -334,6 +333,29 @@ adapter_location :: proc(allocator := context.allocator) -> string {
 		}
 	}
 	return strings.clone("adapter/gdb_extractor.py", allocator)
+}
+
+// executable_directory is where this program actually lives.
+//
+// NOT `filepath.dir(os.args[0])`, which is what this used to be. When the tool
+// is found through the PATH — which is what the README tells a student to set
+// up — argv[0] is the bare word `odin-tutor` and that expression answers `.`,
+// the directory the student happens to be standing in. Everything found
+// "beside the executable" was then looked for beside their exercises instead:
+// `init` could not find the course to copy, and a trace could not find the
+// script it runs inside gdb.
+//
+// The operating system knows the answer; on Linux it is `/proc/self/exe`.
+executable_directory :: proc(allocator := context.allocator) -> string {
+	if path, err := os.get_executable_path(context.temp_allocator); err == nil {
+		return strings.clone(filepath.dir(path), allocator)
+	}
+	// A last resort for a platform with no such call. It is right whenever the
+	// tool was invoked through a path, and no worse than what it replaces.
+	if len(os.args) > 0 && strings.contains(os.args[0], "/") {
+		return strings.clone(filepath.dir(os.args[0]), allocator)
+	}
+	return ""
 }
 
 cmd_assemble :: proc(input_path, output_path: string) -> int {
@@ -455,8 +477,7 @@ course_source :: proc(allocator := context.allocator) -> string {
 	if from_env := os.get_env("TUTOR_EXERCISES", context.temp_allocator); from_env != "" {
 		return strings.clone(from_env, allocator)
 	}
-	if len(os.args) > 0 {
-		beside := filepath.dir(os.args[0])
+	if beside := executable_directory(context.temp_allocator); beside != "" {
 		candidate, err := filepath.join({beside, "exercises"}, context.temp_allocator)
 		if err == nil && os.exists(candidate) {
 			return strings.clone(candidate, allocator)
@@ -490,11 +511,46 @@ cmd_init :: proc(destination: string) -> int {
 	fmt.printfln("Done — %d exercises.", len(found))
 	fmt.println()
 	fmt.printfln("  cd %s", destination)
-	fmt.println("  odin-tutor")
+
+	// The command that ACTUALLY WORKS from there, which is not always
+	// `odin-tutor`. Printing the short name to someone who built this from a
+	// checkout sends them to `command not found` on the very next line, and the
+	// tool knows perfectly well where it is.
+	command, on_path := invocation(context.temp_allocator)
+	fmt.printfln("  %s", command)
+	if !on_path {
+		fmt.println()
+		fmt.printfln("(that is this program. To type just `odin-tutor` instead, put it on your PATH:")
+		fmt.printfln("    export PATH=\"%s:$PATH\")", filepath.dir(command))
+	}
+
 	fmt.println()
 	fmt.println("Open your editor on that directory. Nothing outside it is written to,")
 	fmt.println("and nothing in it is written to by this tool unless you press x to reset.")
 	return 0
+}
+
+// invocation is how the student can name this program from another directory.
+//
+// `odin-tutor` when it is on the PATH, and the absolute path of the running
+// executable when it is not — which is the normal case for someone who has just
+// built it in a checkout, and exactly when a printed instruction is most likely
+// to be pasted verbatim.
+invocation :: proc(allocator := context.allocator) -> (command: string, on_path: bool) {
+	if len(os.args) == 0 {
+		return strings.clone("odin-tutor", allocator), true
+	}
+	name := filepath.base(os.args[0])
+	// Only when it was invoked BY NAME. An executable reached through a path is
+	// not necessarily the one a bare name would find, and sending the student to
+	// a different build is worse than printing a long path.
+	if !strings.contains(os.args[0], "/") && tutor_preflight.find_tool(name) {
+		return strings.clone(name, allocator), true
+	}
+	if absolute, err := filepath.abs(os.args[0], allocator); err == nil {
+		return absolute, false
+	}
+	return strings.clone(os.args[0], allocator), false
 }
 
 // Loop is one run of the course, and everything the screen needs to redraw

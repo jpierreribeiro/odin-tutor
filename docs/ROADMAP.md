@@ -498,10 +498,19 @@ the validator can be tested through the plain renderer alone.
 
 ## Phase 5b — the shell the loop is missing
 
-> **Built 2026-08-05.** All seven, plus the decision. Twenty-five checks in the
+> **Built 2026-08-05.** All seven, plus the decision. Twenty-eight checks in the
 > Phase 5b section of
 > [`tests/phase5-acceptance.sh`](../tests/phase5-acceptance.sh), which now runs
-> 99.
+> 102.
+>
+> Two of those checks exist because the first person to follow the instructions
+> hit both defects in one session. `init` printed `odin-tutor` as the command to
+> run next, which is `command not found` for anyone who built this from a
+> checkout. And putting the checkout on the PATH — what the README tells you to
+> do — broke everything found "beside the executable", because argv[0] is then
+> the bare word and its directory is wherever the student is standing. `init`
+> found no course to copy and a trace found no adapter. Both are now asked about
+> by the gate, with the environment variables that would hide them unset.
 >
 > **`odin-tutor init` is the one that changed how the tool is used.** The
 > student's course is their own directory: the exercises, the hints, the

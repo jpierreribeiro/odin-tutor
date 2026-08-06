@@ -56,14 +56,30 @@ a_malformed_expression_is_refused_rather_than_guessed :: proc(t: ^testing.T) {
 
 // --- the student's own copy of the course ------------------------------------
 
+// Each test lays out its own tree under its OWN top-level directory.
+//
+// Not a shared parent with per-test subdirectories, which is what this was
+// first: the runner is threaded, and two tests calling make_directory_all on
+// the same missing parent race on creating it. One of them loses, its write
+// lands nowhere, and the failure arrives later as an exercise whose hint file
+// is empty.
 @(private = "file")
-SCRATCH :: "/tmp/odin-tutor-student-test"
+SCRATCH :: "/tmp/odin-tutor-test"
 
 @(private = "file")
-write :: proc(directory, name, contents: string) {
-	_ = os.make_directory_all(directory)
-	path, _ := filepath.join({directory, name}, context.temp_allocator)
-	_ = os.write_entire_file(path, transmute([]byte)contents)
+write :: proc(t: ^testing.T, directory, name, contents: string) {
+	// CHECKED, not discarded. A helper that ignores whether it wrote anything
+	// reports a missing file as a wrong file, which is how the race above cost
+	// an afternoon.
+	err := os.make_directory_all(directory)
+	testing.expect(t, err == nil || os.exists(directory), "the test could not make its own directory")
+	path, join_err := filepath.join({directory, name}, context.temp_allocator)
+	testing.expect(t, join_err == nil, "the test could not build its own path")
+	testing.expect(
+		t,
+		os.write_entire_file(path, transmute([]byte)contents) == nil,
+		"the test could not write its own fixture",
+	)
 }
 
 @(private = "file")
@@ -78,20 +94,18 @@ MANIFEST :: `{"id":"01-values","title":"t","objective":"o","concepts":[],"diffic
 "entry":"start.odin","hints":["hints.md"],
 "assertions":[{"id":"A1","at":"any","expr":"value_of(\"x\") == \"1\""}]}`
 
-// Each test lays out its own tree. The runner is threaded, and a shared scratch
-// directory would have the tests deleting each other's fixtures.
 @(private = "file")
-lay_out_a_source_course :: proc(name: string) -> (source: string, destination: string) {
-	scratch, _ := filepath.join({SCRATCH, name}, context.temp_allocator)
+lay_out_a_source_course :: proc(t: ^testing.T, name: string) -> (source: string, destination: string) {
+	scratch := strings.concatenate({SCRATCH, "-", name}, context.temp_allocator)
 	_ = os.remove_all(scratch)
 	source, _ = filepath.join({scratch, "course", "exercises", "01-values"}, context.temp_allocator)
-	write(source, "exercise.json", MANIFEST)
-	write(source, "start.odin", "package main\n// TODO\n")
-	write(source, "solution.odin", "package main\n// the answer\n")
-	write(source, "hints.md", "a hint\n")
+	write(t, source, "exercise.json", MANIFEST)
+	write(t, source, "start.odin", "package main\n// TODO\n")
+	write(t, source, "solution.odin", "package main\n// the answer\n")
+	write(t, source, "hints.md", "a hint\n")
 	// A counter-example, which belongs to the acceptance script and not to the
 	// student.
-	write(source, "wrong-off-by-one.odin", "package main\n// wrong\n")
+	write(t, source, "wrong-off-by-one.odin", "package main\n// wrong\n")
 	root, _ := filepath.join({scratch, "course", "exercises"}, context.temp_allocator)
 	mine, _ := filepath.join({scratch, "mine"}, context.temp_allocator)
 	return root, mine
@@ -104,7 +118,7 @@ init_hands_the_student_a_copy_and_keeps_the_counter_examples :: proc(t: ^testing
 	// manifest, the file they edit, the hints, and the reference solution the
 	// loop points at when they pass. Not the wrong solutions: a directory of
 	// deliberately broken answers is confusing to read and pointless to open.
-	source, destination := lay_out_a_source_course("handed-over")
+	source, destination := lay_out_a_source_course(t, "handed-over")
 
 	testing.expect_value(t, create(destination, source, context.temp_allocator), Create_Error.None)
 	testing.expect_value(t, read({destination, "exercises", "01-values", "start.odin"}), "package main\n// TODO\n")
@@ -121,7 +135,7 @@ init_hands_the_student_a_copy_and_keeps_the_counter_examples :: proc(t: ^testing
 init_refuses_a_directory_that_already_exists :: proc(t: ^testing.T) {
 	// Overwriting it would overwrite the answers of whoever ran init first.
 	// Nothing is written, and the refusal says which directory it is about.
-	source, destination := lay_out_a_source_course("occupied")
+	source, destination := lay_out_a_source_course(t, "occupied")
 	testing.expect_value(t, create(destination, source, context.temp_allocator), Create_Error.None)
 	testing.expect_value(t, create(destination, source, context.temp_allocator), Create_Error.Occupied)
 	testing.expect(
@@ -135,14 +149,14 @@ init_refuses_a_directory_that_already_exists :: proc(t: ^testing.T) {
 reset_restores_the_file_from_a_copy_the_student_never_edits :: proc(t: ^testing.T) {
 	// `x` has to work after any edit at all, including one that deleted the
 	// file's contents, so it cannot be derived from what is on disk.
-	source, destination := lay_out_a_source_course("reset")
+	source, destination := lay_out_a_source_course(t, "reset")
 	testing.expect_value(t, create(destination, source, context.temp_allocator), Create_Error.None)
 
 	course := course_at(destination, context.temp_allocator)
 	entries := discover(course, context.temp_allocator)
 	testing.expect_value(t, len(entries), 1)
 
-	write(entries[0].directory, "start.odin", "package main\n// ruined\n")
+	write(t, entries[0].directory, "start.odin", "package main\n// ruined\n")
 	testing.expect_value(t, reset(course, entries[0]), Reset_Error.None)
 	testing.expect_value(t, read({destination, "exercises", "01-values", "start.odin"}), "package main\n// TODO\n")
 }
@@ -152,7 +166,7 @@ a_course_without_a_pristine_copy_says_so_instead_of_guessing :: proc(t: ^testing
 	// Running the loop from the repository is how the exercises get written,
 	// and there `x` has nothing to restore from. Inventing a starting file, or
 	// telling the student to run `git checkout`, are both worse than saying it.
-	source, _ := lay_out_a_source_course("no-original")
+	source, _ := lay_out_a_source_course(t, "no-original")
 	repository := Course{exercises = source, state = "/dev/null"}
 	entries := discover(repository, context.temp_allocator)
 	testing.expect_value(t, len(entries), 1)
