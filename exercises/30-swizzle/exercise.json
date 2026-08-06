@@ -1,0 +1,17 @@
+{
+  "id": "30-swizzle",
+  "title": "Reordering without a loop, and without touching the original",
+  "objective": "Show that a swizzle builds a new array in the order you named, leaving the one you swizzled unchanged.",
+  "concepts": ["array", "copy", "mutation", "conversion"],
+  "difficulty": 2,
+  "requires": ["29-array-math"],
+  "entry": "start.odin",
+  "assertions": [
+    { "id": "A1", "at": "any", "expr": "value_of(\"trocado[0]\") == \"3\"" },
+    { "id": "A2", "at": "any", "expr": "value_of(\"trocado[2]\") == \"1\"" },
+    { "id": "A3", "at": "any", "expr": "value_of(\"ordem[0]\") == \"1\"" },
+    { "id": "A4", "at": "final", "expr": "output_equals(\"3 1\\n\")" }
+  ],
+  "hints": ["hints.md"],
+  "expected_wall_ms": 3000
+}

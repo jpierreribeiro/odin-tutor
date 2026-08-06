@@ -1,0 +1,16 @@
+{
+  "id": "29-array-math",
+  "title": "Adding two arrays without a loop",
+  "objective": "Show that arithmetic on fixed arrays applies to every element at once, so there is no loop to get wrong.",
+  "concepts": ["array", "mutation", "loop", "copy"],
+  "difficulty": 2,
+  "requires": ["03-fixed-arrays"],
+  "entry": "start.odin",
+  "assertions": [
+    { "id": "A1", "at": "any", "expr": "value_of(\"soma[0]\") == \"11\"" },
+    { "id": "A2", "at": "any", "expr": "value_of(\"soma[2]\") == \"33\"" },
+    { "id": "A3", "at": "final", "expr": "output_equals(\"11 22\\n\")" }
+  ],
+  "hints": ["hints.md"],
+  "expected_wall_ms": 3000
+}

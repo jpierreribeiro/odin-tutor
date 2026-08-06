@@ -47,13 +47,15 @@ separates them. That is the whole argument for this project in one screen.
 
 ## 2. Mapping
 
-Twenty-eight exercises, against the overview's own section names.
+Thirty exercises, against the overview's own section names.
 
 | Overview section | Exercise | What the picture adds |
 |---|---|---|
 | Hellope, Variable declarations | `01-values` | A variable exists before its line runs, and reads `not yet` rather than stack garbage. |
 | Control flow: `for`, `if` | `02-control-flow` | Stepping backward through a loop, one iteration at a time. |
 | Fixed arrays | `03-fixed-arrays` | The length is part of the type, not a number stored beside it. |
+| Array programming | `29-array-math` | `a + b` applies to every element, so the loop that could stop one short is not written at all. |
+| Swizzle operations | `30-swizzle` | `.zyx` names an order and builds a new array in it, leaving the original alone. |
 | Structs | `04-structs`, `09-nested-structs` | Fields as named slots, read individually — and a struct inside a struct, read all the way down. |
 | Pointers | `05-pointers`, `06-aliasing` | **The first place the picture is essential.** Two names showing `-> [7]` is what aliasing *is*. |
 | Procedures | `07-frames`, `08-recursion` | The frames column, and a recursion whose depth you can see. |
@@ -79,14 +81,13 @@ Twenty-eight exercises, against the overview's own section names.
 ## 3. What will not become an exercise, and why
 
 Each line below was **tried and probed**, not assumed. This section exists so
-that "there are only twenty-eight" reads as a decision with reasons rather than
+that "there are only thirty" reads as a decision with reasons rather than
 as a gap.
 
 | Overview section | Why not |
 |---|---|
 | Maps | Entries are unreadable through the debugger on this toolchain, so only the count is visible ([R-20](RISKS.md#r-20), [ADR-014](decisions/ADR-014-maps-are-counted-not-walked.md)). |
 | `defer` | A leak is invisible here by construction: absence from the reachable set is not evidence of anything ([ADR-011](decisions/ADR-011-absence-is-not-evidence.md)), and `defer`'s ordering is an output fact. The picture adds nothing the text does not say. |
-| Array arithmetic, swizzles | Nothing blocks these now — [R-26](RISKS.md#r-26) gave fixed arrays their elements. They are simply not written yet, and they are the next ones to write. |
 | `distinct` types | Probed: a distinct scalar renders exactly like its base type, so the picture cannot show the difference the type system makes. |
 | Implicit context | Filtered out of the picture on purpose. |
 | Comments, packages, attributes, build tags, foreign, calling conventions, `when` | Prose, tooling, or compile-time. Nothing to see in memory. |
