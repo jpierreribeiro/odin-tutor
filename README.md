@@ -3,17 +3,23 @@
 [![check](https://github.com/jpierreribeiro/odin-tutor/actions/workflows/check.yml/badge.svg)](https://github.com/jpierreribeiro/odin-tutor/actions/workflows/check.yml)
 [![nightly](https://github.com/jpierreribeiro/odin-tutor/actions/workflows/nightly.yml/badge.svg)](https://github.com/jpierreribeiro/odin-tutor/actions/workflows/nightly.yml)
 
-Thirty-three tiny broken Odin programs. Fix them, and learn how memory actually
-behaves while you do.
+## Your program printed the right answer. It is still wrong. Here is why.
+
+Thirty-three tiny broken Odin programs. Fix them, and watch your own memory
+while you do.
+
+Every other exercise runner can tell you *that* you are wrong. This one runs
+your program under a debugger, records what happened, and shows you **the step
+where it went wrong** — the frames, the variables, which pointer pointed where.
 
 **Recommended in parallel with the [official Odin overview](https://odin-lang.org/docs/overview/).**
-The overview explains the language; these make you write it; and when you get it
-wrong, this shows you the memory instead of just saying "wrong".
+The overview explains the language; these make you write it.
 
-When an exercise fails, this tool does not just say *wrong*. It compiles your
-program, runs it once under a debugger, records what happened, and lets you walk
-through it step by step — the frames, the variables, the objects, and which
-pointer pointed where at the moment it went wrong.
+![the exercise loop](docs/images/loop.svg)
+
+Press `t`, and the picture opens at the step that decided it:
+
+![the memory picture](docs/images/picture.svg)
 
 This project is directly inspired by [rustlings](https://github.com/rust-lang/rustlings)
 and [ziglings](https://codeberg.org/ziglings/exercises). The loop is theirs. The
@@ -22,33 +28,37 @@ picture is what this one adds.
 ## Why a picture
 
 Here are two solutions to the sub-slice exercise. **They print exactly the same
-thing.**
-
-```
-3 2
-```
+thing** — `3 2` — and one of them is wrong.
 
 One takes a window onto an array. The other copies part of it. Every test that
 compares printed output accepts both, so a normal exercise runner cannot tell
-them apart — and neither can you, from the output. But the memory is not the
-same, and the tool reads the memory:
+them apart, and neither can you from the output. The memory is not the same:
 
 ```
-OBJECTS
-  #2 struct []int (3)  [shares storage @3]
-      [0] = 7
-      [1] = 8
-      [2] = 9
-  #4 struct []int (2)  [shares storage @3]
-      [0] = 8
-      [1] = 9
+        parte := todos[1:]                    parte := []int{2, 3}
+        ── a window ──────────────            ── a copy ────────────────
+
+OBJECTS                                  OBJECTS
+  ② struct []int (3)   shares with ④       ② struct []int (3)
+      [0] = 1                                  [0] = 1
+      [1] = 2                                  [1] = 2
+      [2] = 3                                  [2] = 3
+  ④ struct []int (2)   shares with ②       ④ struct []int (2)
+      [0] = 2                                  [0] = 2
+      [1] = 3                                  [1] = 3
 ```
 
-Two views, one buffer. That is the right answer, and it is visible.
+Same values. Same output. One says `shares with`, and that is the whole
+difference: write through `parte` in the left one and `todos` changes too.
 
-`#2` and `#4` are identities, not addresses. Run the same program again with
-address randomisation on and they are still `#2` and `#4`, because an address is
-a fact about one run and this is teaching you about the program.
+`②` and `④` are identities, not addresses. Run it again with address
+randomisation on and they are still `②` and `④`, because an address is a fact
+about one run and this is teaching you about the program.
+
+**All thirty-three exercises work this way**, and a check in the gate enforces
+it: every wrong answer must be rejected by an assertion about MEMORY, never only
+by its printed output. An exercise a plain test runner could catch does not need
+this project.
 
 ## Who this is for
 

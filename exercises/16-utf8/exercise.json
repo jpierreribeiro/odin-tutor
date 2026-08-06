@@ -19,6 +19,11 @@
     },
     {
       "id": "A2",
+      "at": "any",
+      "expr": "value_of(\"text[2]\") == \"195 '\\303'\""
+    },
+    {
+      "id": "A3",
       "at": "final",
       "expr": "output_equals(\"naïve ✓ 10\\n\")"
     }

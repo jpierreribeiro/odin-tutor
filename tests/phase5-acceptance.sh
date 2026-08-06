@@ -71,6 +71,64 @@ for id in $exercises; do
 	fi
 done
 
+# AND IT IS REJECTED BY THE PICTURE, not merely by its printed output.
+#
+# SPEC-EX-052 asks that a wrong solution be rejected. That is not enough on its
+# own: an exercise whose counter-example fails only an `output_equals` would be
+# caught by any test runner ever written, and needs none of this project.
+#
+# Measured 2026-08-06: two exercises were in exactly that state. `05-pointers`
+# kept its pointer variable in the wrong answer so every memory assertion passed
+# on both, and `16-utf8` padded to ten ASCII letters so the length matched. Both
+# now assert on something only the picture holds.
+echo
+echo "2b. and the picture is what rejects it, not the printed output"
+weak=""
+for id in $exercises; do
+	report="$work/$id.wrong"
+	[ -f "$report" ] || continue
+	failing=$(grep -E '^  (FAIL|undetermined)' "$report" | awk '{print $2}' | tr '\n' ' ')
+	kind=$(python3 - "exercises/$id/exercise.json" "$failing" <<'SCRIPT'
+import json, sys
+declared = json.load(open(sys.argv[1]))["assertions"]
+failed = set(sys.argv[2].split())
+kinds = set()
+for a in declared:
+    if a["id"] in failed:
+        text = a["expr"]
+        kinds.add("output" if "output_" in text or "exits_with" in text else "memory")
+print("memory" if "memory" in kinds else ("output" if kinds else "nothing"))
+SCRIPT
+)
+	[ "$kind" = "memory" ] || weak="$weak $id"
+done
+if [ -z "$weak" ]; then
+	ok "every exercise rejects its wrong answer by an assertion about MEMORY"
+else
+	bad "rejected only by printed output:$weak" \
+		"Any test runner catches those. They do not need this project."
+fi
+
+# ---------------------------------------------------------------------------
+echo
+echo "2c. every start.odin compiles, and none of them already passes"
+
+# What a student meets FIRST. A start that does not compile is a compiler error
+# where an exercise was meant, and a start that already passes is an exercise
+# with nothing to do — neither is caught by any criterion above, because both
+# are about the file nobody tests.
+for id in $exercises; do
+	if odin build "exercises/$id/start.odin" -file -out:"$work/start-$id" > "$work/start-$id.txt" 2>&1; then
+		if "$tool" check "exercises/$id" > /dev/null 2>&1; then
+			bad "$id: start.odin already passes" "There is nothing for the student to do."
+		else
+			ok "$id: start.odin compiles and does not pass yet"
+		fi
+	else
+		bad "$id: start.odin does not compile" "$(head -2 "$work/start-$id.txt")"
+	fi
+done
+
 # THE WORKED EXAMPLE, and the reason this project draws pictures.
 #
 # The wrong sub-slice solution prints exactly what the reference prints. Every
