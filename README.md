@@ -256,6 +256,28 @@ Nothing here touches the network. Compiled binaries are cached under
 `$XDG_CACHE_HOME/odin-tutor`; nothing else is written outside the paths you
 name.
 
+## Something went wrong
+
+Open an issue: <https://github.com/jpierreribeiro/odin-tutor/issues>
+
+Two things make a report about this tool answerable, and both are one command:
+
+```sh
+odin-tutor preflight                       # your Odin and gdb versions
+odin-tutor trace your.odin /tmp/t.json     # the observation stream, beside it
+```
+
+What this draws depends on the debug information your compiler emits, so the
+versions are usually the first question. `/tmp/t.json.observations` is what the
+debugger actually saw — attach it and the picture can be rebuilt on any machine
+with no debugger at all, which is how most of this project gets diagnosed.
+
+**If the picture looks wrong, that is the most valuable thing you can report.**
+A wrong picture is the one failure this tool treats as unacceptable
+([ADR-008](docs/decisions/ADR-008-unknown-over-false.md)) — four of them were
+found and fixed during development, and every one was found by somebody looking
+at a screen and thinking "that cannot be right".
+
 ## License
 
 MIT. See [LICENSE](LICENSE). The exercises and their solutions are covered by
