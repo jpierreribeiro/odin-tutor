@@ -1,46 +1,30 @@
 # odin-tutor
 
-A local terminal tool that teaches the Odin programming language. It makes
-program execution and memory behaviour visible.
+Sixteen tiny broken Odin programs. Fix them, and learn how memory actually
+behaves while you do.
 
-The student runs an exercise. The tool compiles it, executes it once under a
-debugger, and records a bounded trace. The student then moves forward and
-backward through that trace in a terminal user interface, and sees the call
-stack, the variables, and the object graph at each step.
+When an exercise fails, this tool does not just say *wrong*. It compiles your
+program, runs it once under a debugger, records what happened, and lets you walk
+through it step by step — the frames, the variables, the objects, and which
+pointer pointed where at the moment it went wrong.
 
-## Status
+This project is directly inspired by [rustlings](https://github.com/rust-lang/rustlings)
+and [ziglings](https://codeberg.org/ziglings/exercises). The loop is theirs. The
+picture is what this one adds.
 
-**Version 1 is complete: Phases 0 through 5, and the shell around the student's
-loop (5b).** One command takes a `.odin` file to a rendered
-step, and the picture it draws is the memory model: identities that are never
-addresses, sub-slices shown as windows onto one buffer, pointers resolved to
-references, cycles that show their own identifier, and return values attributed
-to the invocation that produced them. `./check.sh` passes — `-vet -strict-style`
-clean, 68 tests across six packages, both JSON schemas validating the real
-adapter output — and every acceptance criterion of Phases 1 through 6a is
-checked by a script anyone can run, including the interactive loop, which is
-driven through a pseudo-terminal because that is the only way to check a tool
-that reads keys.
+## Why a picture
 
-`fib(6)` shows **25 return values and not one that contradicts its frame**.
-Frame identity was the least validated part of the design; it now has evidence
-at depth 100.
+Here are two solutions to the sub-slice exercise. **They print exactly the same
+thing.**
 
-```sh
-export ODIN_ROOT=/path/to/Odin        # core: imports fail without it
-./check.sh                            # is the code correct?
-./probes/run.sh                       # does this toolchain work?
-./tests/phase1-acceptance.sh          # is the phase done?
-./tests/phase2-acceptance.sh
-./tests/phase3-acceptance.sh
-./tests/phase4-acceptance.sh
-./tests/phase5-acceptance.sh
-./tests/phase6-acceptance.sh
-./tests/adapter-conformance.sh        # would a second adapter draw the same picture?
-
-./odin-tutor trace fixtures/programs/sub-slice.odin trace.json
-./odin-tutor render trace.json 4
 ```
+3 2
+```
+
+One takes a window onto an array. The other copies part of it. Every test that
+compares printed output accepts both, so a normal exercise runner cannot tell
+them apart — and neither can you, from the output. But the memory is not the
+same, and the tool reads the memory:
 
 ```
 OBJECTS
@@ -53,30 +37,91 @@ OBJECTS
       [1] = 9
 ```
 
-Two views, one buffer. `#2` and `#4` are identities, not addresses — trace the
-same program again with address randomisation on and they are the same two
-numbers.
+Two views, one buffer. That is the right answer, and it is visible.
 
-`trace` runs preflight, compiles with a cache keyed by source **and** Odin
-version, drives gdb, records the observation stream beside the trace, and
-assembles it. The recorded stream replays to a byte-identical trace with gdb
-uninstalled, which is what makes every later phase testable in milliseconds.
+`#2` and `#4` are identities, not addresses. Run the same program again with
+address randomisation on and they are still `#2` and `#4`, because an address is
+a fact about one run and this is teaching you about the program.
 
-Sixteen exercises. Make yourself a copy of them, and then run one command:
+## Who this is for
+
+People learning Odin. You should have programmed before, in something — but no
+experience with C, with manual memory management, or with "systems programming"
+is assumed. If pointers, slices, and "who owns this memory" are the parts you
+have never had to think about, that is exactly what the exercises are about.
+
+The Odin language itself is documented at
+[odin-lang.org/docs](https://odin-lang.org/docs/). The exercises assume you will
+have that open beside them.
+
+## What you need
+
+| | |
+|---|---|
+| **Linux, x86-64** | On Windows, use WSL2. macOS is not supported yet. |
+| **The Odin compiler** | A recent build from [odin-lang.org](https://odin-lang.org/). |
+| **GDB, built with Python** | The default `gdb` package on Ubuntu and Fedora is. The tool runs its reader inside gdb. |
+
+These exact combinations have been tested against the full probe suite:
+
+| Odin | GDB | Platform |
+|---|---|---|
+| `dev-2026-08:9caff63` | GNU gdb 15.1 | Ubuntu 24.04, x86-64 |
+| `dev-2026-07-nightly:819fdc7` | GNU gdb 15.0.50 | Ubuntu, x86-64 |
+
+Anything else still runs. The tool checks your versions at startup and warns you
+once if it has not seen them before, rather than pretending it knows.
+
+## Getting started
 
 ```sh
-odin-tutor init            # copies the course into odin-tutor/, which is yours
+git clone https://github.com/jpierreribeiro/odin-tutor.git
 cd odin-tutor
-odin-tutor                 # start, or pick up where you left off
+
+export ODIN_ROOT=/path/to/Odin     # where you unpacked Odin
+odin build src/tutor -out:odin-tutor
+
+./odin-tutor preflight             # is your toolchain going to work?
 ```
 
-You edit inside your own directory, never inside this repository — your answers
-and the course's history are not the same files, and your `git status` stays
-clean.
+`preflight` tells you what it found and stops here if something is missing, so
+you find out now rather than in the middle of an exercise:
 
-That one command takes no arguments. It chooses the next unfinished exercise,
-watches the file you edit, and re-runs it on every save. You never type an
-exercise name. Under every screen:
+```
+odin   dev-2026-07-nightly:819fdc7
+gdb    GNU gdb (Ubuntu 15.0.50.20240403-0ubuntu1) 15.0.50.20240403-git
+       built with Python, which the tracer runs inside
+
+This combination is in the compatibility matrix, backed by a committed probe run.
+```
+
+Now make yourself a copy of the course and start:
+
+```sh
+./odin-tutor init ~/odin-course
+cd ~/odin-course
+odin-tutor
+```
+
+Name where you want it. Inside this clone you have to, because `odin-tutor` is
+already the name of the executable you just built — from anywhere else, a plain
+`odin-tutor init` creates `odin-tutor/` beside you.
+
+You edit inside **your** directory. Nothing you do touches the repository you
+cloned, so updating it later will not fight with your answers.
+
+> **Tip:** so that `odin-tutor` works as a bare word from inside your course,
+> put the checkout on your `PATH` — `export PATH="$PWD:$PATH"` from the clone,
+> or add it to your shell profile. The tool finds its debugger script next to
+> its own executable, so keep the two together.
+
+## Using it
+
+`odin-tutor` takes no arguments. It picks the first exercise you have not
+finished, tells you which file to open, and re-runs it every time you save. You
+never type an exercise name.
+
+Under every screen:
 
 ```
 Progress: [#####>----------------------------------]  2/16
@@ -85,67 +130,102 @@ Current exercise: exercises/03-fixed-arrays/start.odin
 h:hint / t:show me / l:list / c:check all / x:reset / q:quit ?
 ```
 
-`t` is the key the rest of this README is about: it opens the picture at the
-step the failing assertion was decided at, from the run that just happened.
-Nothing is compiled and nothing is run again.
+| Key | |
+|---|---|
+| `t` | **Show me.** Opens the picture at the exact step your failing assertion was decided at. Arrow keys walk it, `g` jumps to a step, `q` comes back. |
+| `h` | A hint for this exercise. Never shown unless you ask. |
+| `n` | Move on. Appears only once the exercise passes. |
+| `l` | The whole list, done and not done. |
+| `c` | Check every exercise, not just this one. |
+| `x` | Put this exercise back the way it started. |
+| `q` | Stop. Your progress is remembered. |
 
-A solved exercise does **not** disappear. It says so, points at the reference
-solution, and waits for `n` — because a pass is evidence about the assertions,
-not about whether you have finished looking
-([ADR-015](docs/decisions/ADR-015-the-student-ends-the-lesson.md)).
+A solved exercise does **not** vanish. It says `Exercise done ✓`, points at the
+reference solution so you can compare, and keeps watching your file until you
+press `n` — because that is the one moment where the whole run is recorded and
+`t` is one keypress away.
 
-The exercise that explains the whole project: its wrong solution prints `3 2`,
-exactly like the reference solution, and fails anyway.
+Your progress lives in your course directory. Two copies of the course do not
+share a count, and deleting the directory deletes everything the tool kept.
 
-```
-  FAIL          A1    no step satisfied this      shares_storage("todos", "parte")
-  pass          A4                                output_equals("3 2\n")
-```
-
-Every test that compares printed output accepts that program. Only the picture
-separates a window onto an array from a copy of part of it.
-
-Phase 6a closed [R-07](docs/RISKS.md#r-07): the adapter records what the program
-hands back to the allocator, so a freed address and the next allocation at it are
-two identities rather than one.
-
-What remains is written down, with tests rather than hopes: use-after-free is not
-detectable by reading ([R-21](docs/RISKS.md#r-21)), an explicitly uninitialised
-local cannot be told from an initialised one ([R-22](docs/RISKS.md)), and a map
-shows its count with its entries `unknown`
-([ADR-014](docs/decisions/ADR-014-maps-are-counted-not-walked.md)). None of them
-fabricates a picture.
-See [`docs/ROADMAP.md`](docs/ROADMAP.md).
-
-Read [`docs/PROJECT.md`](docs/PROJECT.md) first, then
-[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
-
-A first Phase 0 probe run took place on **2026-08-05** against Odin
-`dev-2026-08:9caff63` and GNU gdb 15.1 on Ubuntu 24.04 x86-64. Report:
-[`fixtures/toolchain/2026-08-05-linux-x86_64.md`](fixtures/toolchain/2026-08-05-linux-x86_64.md).
+## What the exercises cover
 
 | | |
 |---|---|
-| Closed by evidence | R-01, R-02, R-03, R-04, R-05, R-08, R-17, R-18 |
-| Landed; mitigation measured and required | R-19 — stepping is **not** confined to the student's source |
-| Opened by the probes | R-20 map entries unreadable ([decided](docs/decisions/ADR-014-maps-are-counted-not-walked.md)) · R-21 use-after-free undetectable by reading · R-22 `= ---` undetectable by reading |
-| Measured | 1.31 ms per student step · 0.98 s to compile |
+| `01-values` | A variable holds the value you last put in it |
+| `02-control-flow` | A loop runs its body once per iteration |
+| `03-fixed-arrays` | A fixed array's length is part of its type, not a number beside it |
+| `04-structs` | Fields are named slots, read individually |
+| `05-pointers` | Writing through a pointer changes the thing it points at |
+| `06-aliasing` | Two names for one object: a change through one shows through the other |
+| `07-frames` | A call gets its own frame, and returns a value to its caller |
+| `08-recursion` | Each invocation has its own frame, argument and return value |
+| `10-new-and-free` | `new` creates an object with an identity; `free` ends it |
+| `11-lifetime` | A pointer to freed memory still looks like a pointer |
+| `12-slices` | A slice carries its length beside its data |
+| `13-sub-slices` | A sub-slice shares memory rather than copying it |
+| `14-dynamic-arrays` | A dynamic array can hold room it is not using |
+| `15-strings` | An Odin string is a view onto bytes |
+| `16-utf8` | A string's length is in bytes, not characters |
+| `20-errors` | Failure is returned, so the caller holds it |
 
-The headline result: **`fib(6)` produced 25 invocations, 25 return values, and
-zero wrong values.** Frame identity under recursion was the least validated part
-of the design. It now has evidence.
+More are planned; the order they will arrive in is in
+[`docs/CURRICULUM.md`](docs/CURRICULUM.md).
 
-A second pass found **three assumptions about Odin that were wrong**, including
-one — detecting a second thread by counting threads — that would have shipped a
-safeguard that never fires. They are in Part 2 of the report.
+## Pointing it at your own program
 
-The remaining unverified assumptions are in
-[`docs/RISKS.md`](docs/RISKS.md), and what the project still cannot claim is in
-[`docs/REVIEW.md`](docs/REVIEW.md) §10.
+The exercises are not the only thing it will read. Any Odin program works:
 
-## Document map
+```sh
+odin-tutor trace mine.odin trace.json   # compile, run once under gdb, record
+odin-tutor play trace.json              # walk it: arrows, g to jump, q to quit
+odin-tutor render trace.json 4          # print step 4 as plain text
+```
 
-Read in this order.
+`play` and `render` never run your program — they read the recording. That is
+why stepping backwards costs nothing, and why you can send someone a
+`trace.json` and have them see exactly what you saw.
+
+## What it will not show you
+
+The rule this project is built on: **unknown is better than false.** A picture
+that is wrong but believable is worse than no picture, because you would learn
+the wrong thing and nothing would warn you. So where the tool cannot know, it
+says so instead of drawing something plausible:
+
+- **Use-after-free** that happens to read sensible-looking bytes. Reading memory
+  cannot distinguish that from a live object.
+- **`x: int = ---`** — an explicitly uninitialised variable looks like an
+  initialised one.
+- **Map entries.** You get the count; the entries read `unknown`, because
+  decoding a private layout silently starts lying after a compiler update.
+- **Threads.** If your program starts a second thread the trace ends there, and
+  says why. With two threads, no single line is responsible for a change.
+- **Long programs.** There are limits on steps, objects and time. Reaching one
+  is reported on screen, and an assertion that needed the missing part comes
+  back `undetermined` — never as your mistake.
+
+Nothing here touches the network. Compiled binaries are cached under
+`$XDG_CACHE_HOME/odin-tutor`; nothing else is written outside the paths you
+name.
+
+## Contributing
+
+```sh
+export ODIN_ROOT=/path/to/Odin
+./check.sh                            # vet, tests, build, schema validation
+./tests/phase5-acceptance.sh          # is a phase actually done?
+./probes/run.sh                       # does this toolchain work at all?
+```
+
+The design is written down before it is built, and each phase ends with a script
+anyone can run rather than an opinion. Start with
+[`docs/PROJECT.md`](docs/PROJECT.md), then
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), and read
+[ADR-013](docs/decisions/ADR-013-odin-conventions.md) before touching `src/`.
+
+<details>
+<summary>The full document map</summary>
 
 | Document | Question it answers |
 |---|---|
@@ -173,17 +253,5 @@ Read in this order.
 | [TRACEABILITY.md](docs/TRACEABILITY.md) | Requirement → spec → test. |
 | [CURRICULUM.md](docs/CURRICULUM.md) | What order do the exercises teach in? |
 | [decisions/](docs/decisions/) | Architecture decision records (`ADR-*`). |
-| [ADR-013](docs/decisions/ADR-013-odin-conventions.md) | **How is the Odin written?** Read before touching `src/`. |
-| [ADR-014](docs/decisions/ADR-014-maps-are-counted-not-walked.md) | Why a map shows a count and no entries. |
-| [ADR-015](docs/decisions/ADR-015-the-student-ends-the-lesson.md) | Why a solved exercise waits for you instead of moving on. |
 
-## The one rule that outranks the others
-
-**Unknown is better than false.**
-
-This tool draws pictures of memory. A picture that is wrong but believable is
-worse than no picture, because the student learns the wrong thing and has no
-signal that anything failed. If the system cannot determine a value, an
-identity, or a relationship, it must report that state. It must not guess.
-
-See [ADR-008](docs/decisions/ADR-008-unknown-over-false.md).
+</details>
