@@ -3,8 +3,12 @@
 [![check](https://github.com/jpierreribeiro/odin-tutor/actions/workflows/check.yml/badge.svg)](https://github.com/jpierreribeiro/odin-tutor/actions/workflows/check.yml)
 [![nightly](https://github.com/jpierreribeiro/odin-tutor/actions/workflows/nightly.yml/badge.svg)](https://github.com/jpierreribeiro/odin-tutor/actions/workflows/nightly.yml)
 
-Sixteen tiny broken Odin programs. Fix them, and learn how memory actually
+Twenty tiny broken Odin programs. Fix them, and learn how memory actually
 behaves while you do.
+
+**Recommended in parallel with the [official Odin overview](https://odin-lang.org/docs/overview/).**
+The overview explains the language; these make you write it; and when you get it
+wrong, this shows you the memory instead of just saying "wrong".
 
 When an exercise fails, this tool does not just say *wrong*. It compiles your
 program, runs it once under a debugger, records what happened, and lets you walk
@@ -134,7 +138,7 @@ never type an exercise name.
 Under every screen:
 
 ```
-Progress: [#####>----------------------------------]  2/16
+Progress: [#####>----------------------------------]  2/20
 Current exercise: exercises/03-fixed-arrays/start.odin
 
 h:hint / t:show me / l:list / c:check all / x:reset / q:quit ?
@@ -160,6 +164,9 @@ share a count, and deleting the directory deletes everything the tool kept.
 
 ## What the exercises cover
 
+Each one accompanies a section of the
+[official overview](https://odin-lang.org/docs/overview/).
+
 | | |
 |---|---|
 | `01-values` | A variable holds the value you last put in it |
@@ -177,10 +184,21 @@ share a count, and deleting the directory deletes everything the tool kept.
 | `14-dynamic-arrays` | A dynamic array can hold room it is not using |
 | `15-strings` | An Odin string is a view onto bytes |
 | `16-utf8` | A string's length is in bytes, not characters |
+| `17-enums` | The value is a name, not a slot number |
+| `18-varargs` | Any number of arguments arrives as one slice |
+| `19-arenas` | Allocating moves a mark; unused, it never moves |
 | `20-errors` | Failure is returned, so the caller holds it |
+| `21-or-return` | The error leaves on its own instead of becoming a zero |
 
-More are planned; the order they will arrive in is in
-[`docs/CURRICULUM.md`](docs/CURRICULUM.md).
+**Five of them print the same thing whether you are right or wrong.** That is
+deliberate: `13-sub-slices`, `17-enums`, `18-varargs`, `19-arenas` and
+`20-errors` each have a plausible wrong answer that passes every output check
+ever written. Only the memory tells them apart.
+
+More are planned. [`docs/CURRICULUM.md`](docs/CURRICULUM.md) maps every one to
+its overview section — and lists what will **not** become an exercise, with the
+reason for each. Unions and maps are not there because this tool cannot read
+them honestly, and it says so rather than drawing something.
 
 ## Pointing it at your own program
 

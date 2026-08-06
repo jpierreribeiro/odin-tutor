@@ -1,0 +1,16 @@
+{
+  "id": "19-arenas",
+  "title": "Memory that moves a mark",
+  "objective": "Show that an arena hands out memory by moving one offset, so what you allocated is visible as a number that grew.",
+  "concepts": ["allocation", "ownership", "struct", "field"],
+  "difficulty": 3,
+  "requires": ["10-new-and-free"],
+  "entry": "start.odin",
+  "assertions": [
+    { "id": "A1", "at": "any", "expr": "value_of(\"arena.offset\") == \"16\"" },
+    { "id": "A2", "at": "any", "expr": "value_of(\"arena.peak_used\") == \"16\"" },
+    { "id": "A3", "at": "final", "expr": "output_equals(\"3 4\\n\")" }
+  ],
+  "hints": ["hints.md"],
+  "expected_wall_ms": 3000
+}

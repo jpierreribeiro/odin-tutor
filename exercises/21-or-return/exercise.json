@@ -1,0 +1,16 @@
+{
+  "id": "21-or-return",
+  "title": "The error that leaves on its own",
+  "objective": "Show that or_return hands the caller's failure straight back, so a procedure that cannot answer does not invent one.",
+  "concepts": ["procedure", "return", "conditional", "frame"],
+  "difficulty": 3,
+  "requires": ["20-errors"],
+  "entry": "start.odin",
+  "assertions": [
+    { "id": "A1", "at": "any", "expr": "value_of(\"err\") == \"Empty\"" },
+    { "id": "A2", "at": "any", "expr": "value_of(\"n\") == \"0\"" },
+    { "id": "A3", "at": "final", "expr": "output_equals(\"0 Empty\\n\")" }
+  ],
+  "hints": ["hints.md"],
+  "expected_wall_ms": 3000
+}

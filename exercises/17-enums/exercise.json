@@ -1,0 +1,16 @@
+{
+  "id": "17-enums",
+  "title": "A name, not a number",
+  "objective": "Show that an enum value carries its name, so the picture says what it is rather than which slot it sits in.",
+  "concepts": ["variable", "constant", "conversion"],
+  "difficulty": 1,
+  "requires": ["01-values"],
+  "entry": "start.odin",
+  "assertions": [
+    { "id": "A1", "at": "any", "expr": "value_of(\"held\") == \"Silver\"" },
+    { "id": "A2", "at": "any", "expr": "state_of(\"held\") == \"valid\"" },
+    { "id": "A3", "at": "final", "expr": "output_equals(\"Silver\\n\")" }
+  ],
+  "hints": ["hints.md"],
+  "expected_wall_ms": 3000
+}

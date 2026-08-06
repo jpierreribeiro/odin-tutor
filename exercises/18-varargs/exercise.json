@@ -1,0 +1,16 @@
+{
+  "id": "18-varargs",
+  "title": "Any number of arguments is one slice",
+  "objective": "Show that a variadic parameter arrives as a slice, so the count the caller wrote is a length you can read.",
+  "concepts": ["procedure", "parameter", "slice", "frame"],
+  "difficulty": 2,
+  "requires": ["07-frames", "12-slices"],
+  "entry": "start.odin",
+  "assertions": [
+    { "id": "A1", "at": "any", "expr": "length_of(\"nums\") == 3" },
+    { "id": "A2", "at": "any", "expr": "element_count(\"nums\") == 3" },
+    { "id": "A3", "at": "final", "expr": "output_equals(\"6\\n\")" }
+  ],
+  "hints": ["hints.md"],
+  "expected_wall_ms": 3000
+}

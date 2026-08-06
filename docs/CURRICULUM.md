@@ -1,107 +1,99 @@
 # CURRICULUM
 
-The order the exercises teach in, and where each one comes from.
+The order the exercises teach in, what each one accompanies, and — just as
+important — what will **not** become an exercise, and why.
 
 ---
 
 ## 1. The spine
 
-The curriculum follows *Understanding the Odin Programming Language* by Karl
-Zylinski. Its chapter order is already a teaching order that works, and
-reproducing that order costs nothing and inherits its judgement.
+The course follows the **official Odin overview**,
+<https://odin-lang.org/docs/overview/>, section by section.
 
-This is the same relationship rustlings has to *The Rust Programming Language*:
-the book explains, the exercises make you do it. The difference is what this
-tool adds — the book can show you a diagram of a slice; the tool shows you
-**your** slice, at the step your code was wrong.
+That is the same relationship rustlings has to *The Rust Programming Language*
+and ziglings has to the Zig docs: the reference explains, the exercises make you
+do it. The difference this tool adds is the third step — when you get it wrong,
+you see your own memory at the step it went wrong.
 
-### The rule that decides which chapters become exercises
+The overview was chosen over a book because it is **free, official, and the
+thing a person already has open** when they start Odin. A course whose first
+instruction is "buy this" has a barrier in front of the second exercise.
+
+> *Going deeper:* **Understanding the Odin Programming Language** (Karl
+> Zylinski) covers the same ground at book length, and its chapter order is a
+> teaching order that works. This curriculum used to follow it. Where the two
+> disagree on ordering, the overview wins, because it is the one every student
+> can open.
+
+### The rule that decides which sections become exercises
 
 > An exercise earns its place when the **picture** teaches something the text
 > cannot.
 
-A chapter about naming conventions does not become an exercise. A chapter about
-pointers does, because "two names, one object" is a sentence in a book and a
-visible fact on the screen.
+Comments, attributes, build tags and calling conventions do not become
+exercises: reading about them is enough, and a memory picture of them says
+nothing. Pointers do, because "two names, one object" is a sentence in a
+reference and a visible fact on the screen.
+
+**The strongest exercises are the ones where the printed output is IDENTICAL for
+the right and the wrong answer.** Five of the twenty are built that way on
+purpose: `13-sub-slices`, `17-enums`, `18-varargs`, `19-arenas`, and `20-errors`.
+Every test that compares printed text accepts both programs; only the picture
+separates them. That is the whole argument for this project in one screen.
 
 ---
 
 ## 2. Mapping
 
-| Book chapter | Exercises | Why the picture helps |
+Twenty exercises, against the overview's own section names.
+
+| Overview section | Exercise | What the picture adds |
 |---|---|---|
-| 3 Variables and constants | `01-values` | The four value states appear immediately: a variable exists before its line runs, and shows `not created yet` rather than stack garbage. |
-| 4 Some additional basics | `02-control-flow`, `03-fixed-arrays` | Stepping backward through a loop is the whole lesson. |
-| 5 Making new types | `04-structs` | Fields as named slots, not as a printed line. |
-| 6 Pointers | `05-pointers`, `06-aliasing` | **The first chapter where the picture is essential.** Two names showing `-> #7` is what aliasing *is*. |
-| 7 Procedures and scopes | `07-frames`, `08-recursion` | The frames column, and a recursion whose depth you can see. `fib` shows five frames with five different `n`. |
-| 8 Fixed-memory containers | `09-fixed-containers` | Capacity against length, visible as two numbers that differ. |
-| 9 Manual memory management | `10-new-and-free`, `11-lifetime` | An object that exists, then does not. **See §4 — this is where the tool's limits are honest.** |
-| 10 More container types | `12-slices`, `13-sub-slices`, `14-dynamic-arrays` | The sub-slice exercise is the flagship: a wrong solution prints the right answer and the picture shows why it is wrong. |
-| 11 Strings | `15-strings`, `16-utf8` | A string as `{data, len}`, and the byte-against-character distinction made visible. |
-| 12 Implicit context | — | No exercise. The context is filtered out of the picture on purpose. |
-| 13 Making memory easier | `17-arenas` | Allocations grouped by lifetime, dying together. |
-| 14 Parametric polymorphism | `18-generics` | Marginal. The picture adds little. |
-| 15 Bit-related types | `19-bit-sets` | Marginal. |
-| 16 Error handling | `20-errors` | The multiple-return convention as slots, not as prose. |
-| 20 Data-oriented design | `21-soa` | Structure of arrays against array of structures, side by side. |
-| 22 Debuggers | — | The tool *is* this chapter. |
-| 23 Features to avoid | — | Prose, not practice. |
-
-Chapters 1, 2, 17, 18, 19, 21, 24–30 produce no exercises. They are setup,
-tooling, or reference.
+| Hellope, Variable declarations | `01-values` | A variable exists before its line runs, and reads `not yet` rather than stack garbage. |
+| Control flow: `for`, `if` | `02-control-flow` | Stepping backward through a loop, one iteration at a time. |
+| Fixed arrays | `03-fixed-arrays` | The length is part of the type, not a number stored beside it. |
+| Structs | `04-structs` | Fields as named slots, read individually. |
+| Pointers | `05-pointers`, `06-aliasing` | **The first place the picture is essential.** Two names showing `-> [7]` is what aliasing *is*. |
+| Procedures | `07-frames`, `08-recursion` | The frames column, and a recursion whose depth you can see. |
+| Enumerations | `17-enums` | A name is the value. The lookup-table version prints the same word and holds a `1`. |
+| Variadic parameters | `18-varargs` | `..int` arrives as a slice whose length is the count the caller wrote. |
+| Allocators: `new`, `free` | `10-new-and-free`, `11-lifetime` | An object that exists, then does not; and a pointer that outlives it. |
+| Allocators: arenas | `19-arenas` | The mark moves by exactly what you took. Unused, it reads 0. |
+| Slices | `12-slices`, `13-sub-slices` | The flagship: a wrong sub-slice prints the right answer. |
+| Dynamic arrays | `14-dynamic-arrays` | Capacity against length, two numbers that differ. |
+| `string` type, string iteration | `15-strings`, `16-utf8` | A string as `{data, len}`, and bytes against characters. |
+| Multiple results | `20-errors` | The failure as a second slot, not as prose. |
+| `or_return` | `21-or-return` | The error leaving on its own, instead of a zero that looks like an answer. |
 
 ---
 
-## 3. Order
+## 3. What will not become an exercise, and why
 
-Exercises are numbered in the order above and are meant to be done in it. Each
-one names the chapter it follows, so a stuck student has somewhere to read.
+Each line below was **tried and probed**, not assumed. This section exists so
+that "there are only twenty" reads as a decision with reasons rather than as a
+gap.
 
-### SPEC-CURR-001 — An exercise names its chapter
-`exercise.json` carries a `reading` field: the chapter and section. It is a
-pointer, not a copy. This project does not reproduce the book's text.
-
-### SPEC-CURR-002 — Every exercise rejects a plausible wrong solution
-[SPEC-EX-052](EXERCISE-SPEC.md#spec-ex-052). An exercise whose assertions pass
-for a wrong answer teaches the wrong thing with the tool's authority behind it.
-
-The worked example is `13-sub-slices`, where the wrong solution produces the
-**right printed output** and only the picture shows the mistake. If an exercise
-cannot be given such a case, it is a reading, not an exercise.
-
----
-
-## 4. Where the curriculum must not overreach
-
-Two chapters describe things this tool **cannot show**, and the exercises for
-them are written around that rather than pretending.
-
-### Chapter 9, use after free
-The tool cannot detect it. Measured 2026-08-05: reading through a pointer after
-`free` returned `8313165202016105638` with no error, because the region stays
-mapped. [R-21](RISKS.md#r-21).
-
-`10-new-and-free` therefore teaches allocation and release as **events in the
-program**, and its assertions are about what the code did, not about the tool
-catching a mistake. The exercise text says so. A student who believes the tool
-would have caught a use-after-free has been taught something false about their
-own safety.
-
-### Chapter 10, maps
-Map entries are not readable through the debugger on this toolchain: the type
-exposes `data`, `len`, and `allocator`, and nothing else.
-[R-20](RISKS.md#r-20), [SPEC-MEM-053](MEMORY-MODEL.md#spec-mem-053).
-
-There is no map exercise in the list above, and that is deliberate. An exercise
-about a container the picture cannot open is a worse experience than no
-exercise. If [ADR-014](decisions/ADR-014-maps-are-counted-not-walked.md) is ever revisited in favour of decoding the layout, `12b-maps` joins
-the list; until then it does not exist.
+| Overview section | Why not |
+|---|---|
+| Unions, type switch | The model has no rule for a union, so the whole screen reads `unknown` ([R-24](RISKS.md#r-24)). Honest, and it teaches nothing about unions. Tractable — this is the first hole worth closing. |
+| Maps | Entries are unreadable through the debugger on this toolchain, so only the count is visible ([R-20](RISKS.md#r-20), [ADR-014](decisions/ADR-014-maps-are-counted-not-walked.md)). |
+| Nested structs | **Withheld because the picture is currently WRONG** — two fields of a nested struct are drawn as one shared storage ([R-23](RISKS.md#r-23)). The exercise is written and will land when that is fixed. |
+| `defer` | A leak is invisible here by construction: absence from the reachable set is not evidence of anything ([ADR-011](decisions/ADR-011-absence-is-not-evidence.md)), and `defer`'s ordering is an output fact. The picture adds nothing the text does not say. |
+| `#soa` | Blocked by the same defect as nested structs ([R-23](RISKS.md#r-23)): `x` and `y` resolve to one identity. |
+| Implicit context | Filtered out of the picture on purpose. |
+| Comments, packages, attributes, build tags, foreign, calling conventions, `when` | Prose, tooling, or compile-time. Nothing to see in memory. |
+| Parametric polymorphism, bit sets, `bit_field`, matrices | Marginal. The picture shows the concrete instance, which the text already told you. Candidates if the course ever needs more. |
 
 ---
 
-## 5. Attribution
+## 4. Order
 
-The book is *Understanding the Odin Programming Language*, by Karl Zylinski.
-This project uses its **chapter order** as a curriculum spine and cites it as
-reading. It reproduces none of its text, and it is not a substitute for it.
+Exercises are done in the order the tool offers them, which is their id order.
+Each one names the overview section it accompanies, so a stuck student has
+somewhere to read that is one click away and free.
+
+Ids are stable ([SPEC-EX-011](EXERCISE-SPEC.md#spec-ex-011)): a student's
+progress is keyed by them, so an exercise added later takes the next free number
+rather than renumbering the ones already finished. That is why the numbering has
+gaps and does not run in a straight line — `17-enums` teaches something a
+beginner meets early, and it was written late.

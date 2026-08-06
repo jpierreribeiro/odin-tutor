@@ -732,6 +732,81 @@ That raises the priority of Phase 6 again rather than lowering it.
 
 ---
 
+<a id="r-23"></a>
+### R-23 — A nested struct's scalar fields are drawn as ONE shared storage
+**Class:** BLOCKING for the picture's promise · **Status: OPEN, found 2026-08-06**
+
+This is not a limit. **It is a wrong picture**, which is the one thing
+[ADR-008](decisions/ADR-008-unknown-over-false.md) says must never ship.
+
+The same struct, at the same values, rendered two ways:
+
+```odin
+Ponto :: struct { x: int, y: int }
+
+p := Ponto{x = 3, y = 4}              // FLAT — correct
+//   [2] struct main::Ponto
+//       x = 3
+//       y = 4
+
+Casa :: struct { canto: Ponto, lado: int }
+casa := Casa{canto = Ponto{x = 3, y = 4}, lado = 10}   // NESTED — wrong
+//   [3] struct main::Ponto
+//       x -> [4]
+//       y -> [4]      <- the same identity as x
+//   [4] int …
+```
+
+Two fields that are eight bytes apart are shown as **two names for one object**,
+which is the exact vocabulary this tool uses for aliasing
+([SPEC-TUI-002](TUI-SPEC.md#spec-tui-002)). A student reading that screen would
+conclude that writing `casa.canto.x` changes `casa.canto.y`. It does not.
+
+The value is elided as `…` on top of it, so the screen is both wrong and
+uninformative.
+
+**How it was found.** Writing a nested-struct exercise for the curriculum. The
+reference solution failed its own assertions — `value_of("casa.canto.x")` could
+not be read — and the render explained why. The exercise is withheld until this
+is fixed; a course that teaches from this screen would teach the opposite of the
+truth.
+
+**Suspected cause.** The overlap-based storage grouping that gives sub-slices
+their shared identity ([SPEC-MEM-040](MEMORY-MODEL.md#spec-mem-040)). Adjacent
+scalar fields inside a nested aggregate appear to be collapsed into one storage
+by the same rule that correctly groups a slice with its parent array.
+
+**The same shape appears in `#soa`**, where `x` and `y` of a `#soa[2]Point` also
+resolve to one identity. That is a second symptom, not a second defect.
+
+**What must not be done meanwhile:** nothing that hides it. No exercise uses a
+nested struct, and this entry — not a passing test — is the record.
+
+<a id="r-24"></a>
+### R-24 — A union has no rule, so it reads `unknown`
+**Class:** MEDIUM · **Status: ANSWERED — it is honest, and it costs a chapter**
+
+```odin
+Value :: union { int, string }
+v: Value = 42
+//   v ? unknown (no rule for this shape)
+```
+
+The model has no rule for a tagged union, so it says so. That is the correct
+behaviour under [ADR-008](decisions/ADR-008-unknown-over-false.md) — it does not
+guess a variant — and it is why unions are not an exercise: a lesson whose whole
+screen reads `unknown` teaches nothing about unions and everything about the
+tool.
+
+Unlike [R-20](#r-20), this one looks tractable: a union's tag and payload are
+described in DWARF, so a rule could read the tag, choose the variant, and render
+it. It is scoped work, not a wall.
+
+**What must not be claimed:** that the tool covers Odin's type system. It covers
+what it can read, and this is a named hole.
+
+---
+
 ## 4. Risks deliberately not carried
 
 | Not a risk here | Why |
