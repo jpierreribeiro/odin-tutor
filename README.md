@@ -3,7 +3,7 @@
 [![check](https://github.com/jpierreribeiro/odin-tutor/actions/workflows/check.yml/badge.svg)](https://github.com/jpierreribeiro/odin-tutor/actions/workflows/check.yml)
 [![nightly](https://github.com/jpierreribeiro/odin-tutor/actions/workflows/nightly.yml/badge.svg)](https://github.com/jpierreribeiro/odin-tutor/actions/workflows/nightly.yml)
 
-Twenty-four tiny broken Odin programs. Fix them, and learn how memory actually
+Twenty-five tiny broken Odin programs. Fix them, and learn how memory actually
 behaves while you do.
 
 **Recommended in parallel with the [official Odin overview](https://odin-lang.org/docs/overview/).**
@@ -138,7 +138,7 @@ never type an exercise name.
 Under every screen:
 
 ```
-Progress: [#####>----------------------------------]  2/24
+Progress: [#####>----------------------------------]  2/25
 Current exercise: exercises/03-fixed-arrays/start.odin
 
 h:hint / t:show me / l:list / c:check all / x:reset / q:quit ?
@@ -190,6 +190,7 @@ Each one accompanies a section of the
 | `20-errors` | Failure is returned, so the caller holds it |
 | `21-or-return` | The error leaves on its own instead of becoming a zero |
 | `22-string-copy` | Copying a string does not copy its bytes |
+| `23-struct-copy` | Assigning a struct copies it; taking its address does not |
 | `24-parameters` | A parameter is a copy until you pass a pointer |
 | `25-in-place` | A by-reference loop changes the thing, not a copy of it |
 | `26-sorting` | Sorting in place reorders the buffer everyone else can see |

@@ -47,7 +47,7 @@ separates them. That is the whole argument for this project in one screen.
 
 ## 2. Mapping
 
-Twenty-four exercises, against the overview's own section names.
+Twenty-five exercises, against the overview's own section names.
 
 | Overview section | Exercise | What the picture adds |
 |---|---|---|
@@ -67,6 +67,7 @@ Twenty-four exercises, against the overview's own section names.
 | Multiple results | `20-errors` | The failure as a second slot, not as prose. |
 | `or_return` | `21-or-return` | The error leaving on its own, instead of a zero that looks like an answer. |
 | `string` type conversions | `22-string-copy` | Assigning a string hands over a second view of the same bytes; `strings.clone` makes a second set. Both print the same lengths. |
+| Structs: assignment | `23-struct-copy` | Two objects, or one object with two names. The tool could not draw this correctly until [R-25](RISKS.md#r-25) was fixed, which is why the exercise arrived after the defect. |
 | Procedures: parameters | `24-parameters` | A parameter is a copy until you pass a pointer. The wrong answer doubles at the call site and prints the same number. |
 | `for` by reference | `25-in-place` | `for &n` writes into the slice; the by-value version computes on the way to the screen and changes nothing. |
 | Sort slices | `26-sorting` | Sorting in place reorders the buffer every other name shares; sorting a clone leaves the original as it was. |
@@ -76,17 +77,16 @@ Twenty-four exercises, against the overview's own section names.
 ## 3. What will not become an exercise, and why
 
 Each line below was **tried and probed**, not assumed. This section exists so
-that "there are only twenty-four" reads as a decision with reasons rather than
+that "there are only twenty-five" reads as a decision with reasons rather than
 as a gap.
 
 | Overview section | Why not |
 |---|---|
 | Unions, type switch | The model has no rule for a union, so the whole screen reads `unknown` ([R-24](RISKS.md#r-24)). Honest, and it teaches nothing about unions. Tractable — this is the first hole worth closing. |
 | Maps | Entries are unreadable through the debugger on this toolchain, so only the count is visible ([R-20](RISKS.md#r-20), [ADR-014](decisions/ADR-014-maps-are-counted-not-walked.md)). |
-| Nested structs | **Withheld because the picture is currently WRONG** — two fields of a nested struct are drawn as one shared storage ([R-23](RISKS.md#r-23)). The exercise is written and will land when that is fixed. |
+| Nested structs | The false picture is fixed ([R-23](RISKS.md#r-23)), and a limit remains: a struct inside a struct is one level past the adapter's expansion depth, so its fields read `…` and cannot be asserted on. The exercise waits on a budget change, not on a lie. |
 | `defer` | A leak is invisible here by construction: absence from the reachable set is not evidence of anything ([ADR-011](decisions/ADR-011-absence-is-not-evidence.md)), and `defer`'s ordering is an output fact. The picture adds nothing the text does not say. |
-| `#soa` | Blocked by the same defect as nested structs ([R-23](RISKS.md#r-23)): `x` and `y` resolve to one identity. |
-| Copy versus reference on locals | **Withheld: the picture is WRONG the other way** ([R-25](RISKS.md#r-25)). A pointer to a local is drawn as a second object holding equal values, so `not_alias` reports the opposite of the truth. Written, and waiting. |
+| `#soa` | Shared the nested-struct defect ([R-23](RISKS.md#r-23)) and has not been re-probed since the fix. |
 | Fixed-array CONTENTS — array arithmetic, swizzles | The element accessor ([SPEC-VAL-026](VALIDATION-SPEC.md#spec-val-026)) unblocked slices and dynamic arrays, and `25-in-place` and `26-sorting` came straight out of it. A fixed array of scalars is still recorded as one compact text with no elements ([R-26](RISKS.md#r-26)), so exercises about contents are written against slices for now. |
 | `distinct` types | Probed: a distinct scalar renders exactly like its base type, so the picture cannot show the difference the type system makes. |
 | Implicit context | Filtered out of the picture on purpose. |

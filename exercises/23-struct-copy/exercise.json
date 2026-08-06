@@ -1,0 +1,16 @@
+{
+  "id": "23-struct-copy",
+  "title": "Assigning a struct copies it",
+  "objective": "Show that assigning a struct makes a second object, so changing one does not reach the other.",
+  "concepts": ["struct", "copy", "aliasing", "pointer"],
+  "difficulty": 2,
+  "requires": ["04-structs", "06-aliasing"],
+  "entry": "start.odin",
+  "assertions": [
+    { "id": "A1", "at": "all", "expr": "not_alias(\"a\", \"b\")" },
+    { "id": "A2", "at": "any", "expr": "value_of(\"b.x\") == \"9\"" },
+    { "id": "A3", "at": "final", "expr": "output_equals(\"1 9\\n\")" }
+  ],
+  "hints": ["hints.md"],
+  "expected_wall_ms": 3000
+}

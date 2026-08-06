@@ -399,7 +399,16 @@ slot_from_value :: proc(
 	}
 
 	#partial switch variable.value.kind {
-	case .Scalar:
+	case .Scalar, .Opaque:
+		// AN OPAQUE VALUE IS NOT AN OBJECT. It is a value the adapter stopped
+		// expanding — at a depth limit, or because it had no rule for the shape
+		// — and it arrives carrying only a marker.
+		//
+		// Building an entity for it produced R-23: every opaque value of one
+		// type has no address, so they all minted the same key, and the two
+		// scalar fields of a nested struct came out as ONE object that both
+		// names pointed at. That is this tool's vocabulary for aliasing, said
+		// about two fields eight bytes apart.
 		slot.text = variable.value.text
 	case .Pointer:
 		if variable.value.data != 0 {
@@ -476,13 +485,33 @@ entity_from_value :: proc(
 		kind = .View
 	}
 
+	// WHERE THE THING IS, not where the name that reached it lives.
+	//
+	// A view is identified by the buffer it points at, and by the holder that
+	// distinguishes two empty views. An OBJECT has no `data`: it is at
+	// `value.address`, and that is its identity — the same address the object
+	// list mints an identity from when the same storage is reached through a
+	// pointer.
+	//
+	// Keying an object on its holder instead produced R-25: `b := &a` drew TWO
+	// Ponto objects holding equal values, because the local read directly and
+	// the same bytes read through the pointer minted different keys. One
+	// storage, two identities, and the screen said they were separate objects —
+	// the exact opposite of what `06-aliasing` teaches.
+	storage := value.data
+	holder := value.address
+	if kind == .Object && storage == 0 {
+		storage = value.address
+		holder = 0
+	}
+
 	key := Key {
 		kind      = kind,
-		address   = value.data,
-		location  = value.address,
+		address   = storage,
+		location  = holder,
 		length    = value.length,
 		type_name = value.type_name,
-		epoch     = epoch_for(&a.registry, value.data, value.type_name),
+		epoch     = epoch_for(&a.registry, storage, value.type_name),
 	}
 	id = identity_for(&a.registry, key)
 

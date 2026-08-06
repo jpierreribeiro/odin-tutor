@@ -858,3 +858,79 @@ a_complete_absence_does_change_the_identity_end_to_end :: proc(t: ^testing.T) {
 		"an address that vanished from a complete observation and came back is a new object",
 	)
 }
+
+@(test)
+one_storage_is_one_identity_however_it_was_reached :: proc(t: ^testing.T) {
+	// R-25. `b := &a` is ONE Ponto. Read directly as a frame variable it is at
+	// `address`; read through the pointer it arrives in the object list at the
+	// same address. Before this, those two readings minted different keys, so
+	// the screen showed two objects holding equal values — one storage drawn as
+	// two, which is the opposite of what 06-aliasing teaches.
+	//
+	// No exercise caught it because every pointer in the course points at a
+	// heap allocation, where the local IS the pointer and only one entity is
+	// ever produced.
+	ADDRESS :: 0x7fff_0000
+	local := tutor_obs.Value {
+		state = .Valid, kind = .Struct, type_name = "struct main::Ponto",
+		address = ADDRESS,
+		members = {{name = "x", value = scalar("9")}},
+	}
+	pointer := tutor_obs.Value {
+		state = .Valid, kind = .Pointer, type_name = "struct main::Ponto *",
+		data = ADDRESS, text = "->",
+	}
+	record := tutor_obs.Record {
+		index = 0, file = "m.odin", line = 1,
+		frames = {one_frame({{name = "a", value = local}, {name = "b", value = pointer}})},
+		objects = {{address = ADDRESS, value = local}},
+	}
+
+	a: Assembly
+	assert(assembly_init(&a) == nil)
+	defer assembly_destroy(&a)
+	trace, err := assemble(&a, stream_of({record}))
+	testing.expect_value(t, err, Build_Error.None)
+
+	slots := trace.steps[0].frames[0].slots
+	testing.expect_value(t, len(slots), 2)
+	testing.expect(t, slots[0].refers_to != NO_ID, "the local reaches an object")
+	testing.expect_value(t, slots[1].refers_to, slots[0].refers_to)
+	testing.expect(t, slots[1].is_reference, "and the pointer is still marked as one (SPEC-VAL-024)")
+	testing.expect_value(t, len(trace.steps[0].entities), 1)
+}
+
+@(test)
+an_opaque_value_is_not_an_object :: proc(t: ^testing.T) {
+	// R-23. The adapter marks a value it stopped expanding as opaque, and an
+	// opaque value carries no address. Building an entity for it gave every
+	// opaque value of one type the SAME key, so the two scalar fields of a
+	// nested struct came out as one object that both names pointed at — this
+	// tool's vocabulary for aliasing, said about two fields eight bytes apart.
+	elided :: proc(type_name: string) -> tutor_obs.Value {
+		return {state = .Valid, kind = .Opaque, type_name = type_name, text = "…"}
+	}
+	nested := tutor_obs.Value {
+		state = .Valid, kind = .Struct, type_name = "struct main::Ponto",
+		address = 0x7fff_1000,
+		members = {{name = "x", value = elided("int")}, {name = "y", value = elided("int")}},
+	}
+	record := tutor_obs.Record {
+		index = 0, file = "m.odin", line = 1,
+		frames = {one_frame({{name = "p", value = nested}})},
+	}
+
+	a: Assembly
+	assert(assembly_init(&a) == nil)
+	defer assembly_destroy(&a)
+	trace, err := assemble(&a, stream_of({record}))
+	testing.expect_value(t, err, Build_Error.None)
+
+	testing.expect_value(t, len(trace.steps[0].entities), 1)
+	fields := trace.steps[0].entities[0].members
+	testing.expect_value(t, len(fields), 2)
+	for f in fields {
+		testing.expect_value(t, f.refers_to, NO_ID)
+		testing.expect_value(t, f.text, "…")
+	}
+}

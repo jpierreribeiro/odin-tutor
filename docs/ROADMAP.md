@@ -428,11 +428,19 @@ frame panel incomplete.
 > `list`, `hint` — and the acceptance script gained a section for it so the same
 > gap cannot reopen silently.
 >
-> **Twenty-four exercises** as of 2026-08-06, on the curriculum's own ids: `01-values`,
-> `02-control-flow`, `03-fixed-arrays`, `04-structs`, `05-pointers`, `06-aliasing`, `07-frames`, `08-recursion`,
-> `10-new-and-free`, `11-lifetime`, `12-slices`, `13-sub-slices`,
-> `14-dynamic-arrays`, `15-strings`, `16-utf8`, `20-errors`. Every one accepts its reference solution, rejects a plausible wrong
-> one, and has a hint.
+> **Twenty-five exercises** as of 2026-08-06, on the curriculum's own ids:
+> `01-values`, `02-control-flow`, `03-fixed-arrays`, `04-structs`, `05-pointers`,
+> `06-aliasing`, `07-frames`, `08-recursion`, `10-new-and-free`, `11-lifetime`,
+> `12-slices`, `13-sub-slices`, `14-dynamic-arrays`, `15-strings`, `16-utf8`,
+> `17-enums`, `18-varargs`, `19-arenas`, `20-errors`, `21-or-return`,
+> `22-string-copy`, `23-struct-copy`, `24-parameters`, `25-in-place`,
+> `26-sorting`. Every one accepts its reference solution, rejects a plausible
+> wrong one, and has a hint.
+>
+> **Eleven of them print the same thing whether the answer is right or wrong**,
+> so only the picture separates them. That proportion is the point of the
+> project, and it is now a property of the course rather than of one flagship
+> exercise.
 >
 > Three of them accepted their wrong solution when first written, and the
 > acceptance script caught all three. `08-recursion` needed the loop and the

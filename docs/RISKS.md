@@ -733,8 +733,9 @@ That raises the priority of Phase 6 again rather than lowering it.
 ---
 
 <a id="r-23"></a>
-### R-23 — A nested struct's scalar fields are drawn as ONE shared storage
-**Class:** BLOCKING for the picture's promise · **Status: OPEN, found 2026-08-06**
+### R-23 — A nested struct's scalar fields were drawn as ONE shared storage
+**Class:** BLOCKING for the picture's promise · **Status: FIXED 2026-08-06.**
+**A second, smaller limit remains and is stated at the end.**
 
 This is not a limit. **It is a wrong picture**, which is the one thing
 [ADR-008](decisions/ADR-008-unknown-over-false.md) says must never ship.
@@ -771,16 +772,35 @@ not be read — and the render explained why. The exercise is withheld until thi
 is fixed; a course that teaches from this screen would teach the opposite of the
 truth.
 
-**Suspected cause.** The overlap-based storage grouping that gives sub-slices
-their shared identity ([SPEC-MEM-040](MEMORY-MODEL.md#spec-mem-040)). Adjacent
-scalar fields inside a nested aggregate appear to be collapsed into one storage
-by the same rule that correctly groups a slice with its parent array.
+**The cause was not the suspected one.** Overlap-based storage grouping was
+innocent. The adapter had already stopped expanding at a depth limit and marked
+both fields **opaque**, carrying a `…` and no address. The model then built an
+ENTITY for each opaque value — and every opaque value of one type has the same
+key, because they all have address 0. Two fields collapsed into one identity
+because neither had an identity to begin with.
 
-**The same shape appears in `#soa`**, where `x` and `y` of a `#soa[2]Point` also
-resolve to one identity. That is a second symptom, not a second defect.
+**The fix.** An opaque value is not an object. It is a value the tool stopped
+expanding, and it belongs in the slot as text, beside a scalar. Two lines in
+`slot_from_value`, and the regression test is
+`an_opaque_value_is_not_an_object`.
 
-**What must not be done meanwhile:** nothing that hides it. No exercise uses a
-nested struct, and this entry — not a passing test — is the record.
+Nested fields now read:
+
+```
+  [3] struct main::Ponto
+      x = …
+      y = …
+```
+
+**What remains, and it is a limit rather than a lie:** the values are still
+elided. A struct inside a struct is one level past the adapter's expansion
+depth, so `value_of("casa.canto.x")` is `undetermined` — the tool says it did
+not look, instead of claiming two fields are one object. Raising the depth is a
+budget change ([ADR-006](decisions/ADR-006-budgets.md)) and its own piece of
+work.
+
+**`#soa` shares the same cause** and is presumably improved by the same fix; it
+has not been re-probed.
 
 <a id="r-24"></a>
 ### R-24 — A union has no rule, so it reads `unknown`
@@ -808,8 +828,8 @@ what it can read, and this is a named hole.
 ---
 
 <a id="r-25"></a>
-### R-25 — A pointer to a LOCAL draws that local's storage a second time
-**Class:** BLOCKING for the picture's promise · **Status: OPEN, found 2026-08-06**
+### R-25 — A pointer to a LOCAL drew that local's storage a second time
+**Class:** BLOCKING for the picture's promise · **Status: FIXED 2026-08-06**
 
 The sibling of [R-23](#r-23), and the opposite mistake. There, two objects were
 drawn as one. Here, one object is drawn as two.
@@ -838,20 +858,22 @@ them apart is the whole subject of `06-aliasing`.
 points at a HEAP allocation (`new`), where the local IS the pointer and only one
 entity is ever produced. A pointer to a local was never traced.
 
-**Suspected cause.** Identity is meant to be a function of address and epoch
-([SPEC-MEM-002](MEMORY-MODEL.md#spec-mem-002),
-[SPEC-MEM-040](MEMORY-MODEL.md#spec-mem-040)). A storage reached directly as a
-frame variable and the same storage reached through a pointer are not being
-unified into one identity.
+**The cause.** Identity is a function of address and epoch
+([SPEC-MEM-002](MEMORY-MODEL.md#spec-mem-002)), and the two readings minted
+different keys for it. An object reached as a frame variable was keyed on
+`location` — where the name lives — while the same storage reached through a
+pointer was keyed on its address. A view is identified by the buffer it points
+at; an object is identified by where it IS, and now both spellings agree.
 
-**What it blocks.** `23-struct-copy` — "assigning a struct copies it" — was
-written, failed to distinguish its own wrong answer, and is withheld. So is any
-exercise about copy-versus-reference on locals, which is a large part of what a
-beginner needs to understand about a manual-memory language.
+The adapter was correct throughout: it reported one object, at one address, and
+the local's own value carried that same address.
 
-**What must not be done meanwhile:** nothing that hides it. `not_alias` and
-`not_shares_storage` both report the wrong answer here, and no exercise may lean
-on them for locals until this is fixed.
+**The fix.** Five lines in `entity_from_value`, and the regression test is
+`one_storage_is_one_identity_however_it_was_reached`.
+
+**What it unblocked.** `23-struct-copy` — "assigning a struct copies it" — ships
+with this change, and its wrong answer is now rejected by `not_alias` with the
+reason *two different objects*.
 
 ---
 
