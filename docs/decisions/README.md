@@ -27,6 +27,7 @@ person needs the reasoning rather than the result.
 | [ADR-013](ADR-013-odin-conventions.md) | Odin conventions: errors last, arena per trace, `tutor_*` package names, no `using`/`any` | accepted | Otherwise every contributor decides these again, differently | Cheaply, but a mixed codebase is the cost |
 | [ADR-014](ADR-014-maps-are-counted-not-walked.md) | A map is recorded with its count; its entries are `unknown` and the model does not walk it | accepted | Decoding a private layout shows wrong pairs when wrong, and fails silently on a toolchain update | Yes, if Odin ever gives a debugger real map access |
 | [ADR-015](ADR-015-the-student-ends-the-lesson.md) | A solved exercise waits for `n` instead of advancing itself | accepted | A pass is evidence about the assertions, not about whether the student has finished looking | Yes, cheaply — but it would remove the moment the picture is worth opening |
+| [ADR-016](ADR-016-a-free-is-evidence.md) | The trace carries the deaths the program reported, and the screen says them in words | accepted | ADR-011 left the model unable to say anything died, and `defer` unteachable | Yes — it is an optional field and a predicate |
 
 [ADR-000](ADR-000-template.md) is the template. It is not a decision.
 
@@ -38,6 +39,12 @@ The loop advanced by itself, not by decision but because that is what the first
 version happened to do. Putting `rustlings` beside this tool asked the question
 the plan never had. A record exists here so the answer is a choice with a cost
 written down, rather than the residue of whichever was easier to write.
+
+ADR-016 completes [ADR-011](ADR-011-absence-is-not-evidence.md), which is the
+shape a good record often takes: ADR-011 ruled that absence proves nothing, and
+in doing so left the model unable to say anything had died — while Phase 6a was
+already observing exactly that and throwing it away. A rule that forbids an
+inference should be read as a question about where the evidence is instead.
 
 ADR-014 was written **before** Phase 2 touched maps, to close
 [R-20](../RISKS.md#r-20). The behaviour it records was already the adapter's,
@@ -62,7 +69,7 @@ decision is already made, and it is made against.
 ## What is decided and what is not
 
 ### Decided
-The thirteen records above.
+The sixteen records above.
 
 ### Deliberately open
 | Question | Why it stays open | Decided when |

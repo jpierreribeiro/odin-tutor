@@ -159,6 +159,18 @@ screen :: proc(s: Screen, allocator := context.allocator) -> string {
 		write_entity(&b, e, s.entities, s.style)
 	}
 
+	// A death the PROGRAM reported. It is worth its own line because absence
+	// from the picture means nothing on its own (ADR-011): an object that left
+	// because it was freed and one that left because a budget cut the frame
+	// holding it look identical, and only this line separates them.
+	if len(step.died) > 0 {
+		fmt.sbprint(&b, "\nGIVEN BACK TO THE ALLOCATOR AT THIS STEP:")
+		for id in step.died {
+			fmt.sbprintf(&b, " %s", label(id, s.style))
+		}
+		fmt.sbprintln(&b)
+	}
+
 	if len(step.truncations) > 0 {
 		fmt.sbprintln(&b, "\nLIMITS REACHED AT THIS STEP")
 		for t in step.truncations {

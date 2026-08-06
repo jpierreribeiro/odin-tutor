@@ -47,7 +47,7 @@ separates them. That is the whole argument for this project in one screen.
 
 ## 2. Mapping
 
-Thirty exercises, against the overview's own section names.
+Thirty-one exercises, against the overview's own section names.
 
 | Overview section | Exercise | What the picture adds |
 |---|---|---|
@@ -62,6 +62,7 @@ Thirty exercises, against the overview's own section names.
 | Enumerations | `17-enums` | A name is the value. The lookup-table version prints the same word and holds a `1`. |
 | Variadic parameters | `18-varargs` | `..int` arrives as a slice whose length is the count the caller wrote. |
 | Allocators: `new`, `free` | `10-new-and-free`, `11-lifetime` | An object that exists, then does not; and a pointer that outlives it. |
+| `defer` statement | `31-defer` | The leak prints exactly what the tidy program prints, and the object vanishes from the picture either way. Only the free the program REPORTED separates them ([ADR-016](decisions/ADR-016-a-free-is-evidence.md)). |
 | Allocators: arenas | `19-arenas` | The mark moves by exactly what you took. Unused, it reads 0. |
 | Slices | `12-slices`, `13-sub-slices` | The flagship: a wrong sub-slice prints the right answer. |
 | Dynamic arrays | `14-dynamic-arrays` | Capacity against length, two numbers that differ. |
@@ -81,13 +82,12 @@ Thirty exercises, against the overview's own section names.
 ## 3. What will not become an exercise, and why
 
 Each line below was **tried and probed**, not assumed. This section exists so
-that "there are only thirty" reads as a decision with reasons rather than
+that "there are only thirty-one" reads as a decision with reasons rather than
 as a gap.
 
 | Overview section | Why not |
 |---|---|
 | Maps | Entries are unreadable through the debugger on this toolchain, so only the count is visible ([R-20](RISKS.md#r-20), [ADR-014](decisions/ADR-014-maps-are-counted-not-walked.md)). |
-| `defer` | A leak is invisible here by construction: absence from the reachable set is not evidence of anything ([ADR-011](decisions/ADR-011-absence-is-not-evidence.md)), and `defer`'s ordering is an output fact. The picture adds nothing the text does not say. |
 | `distinct` types | Probed: a distinct scalar renders exactly like its base type, so the picture cannot show the difference the type system makes. |
 | Implicit context | Filtered out of the picture on purpose. |
 | Comments, packages, attributes, build tags, foreign, calling conventions, `when` | Prose, tooling, or compile-time. Nothing to see in memory. |

@@ -1,0 +1,16 @@
+{
+  "id": "31-defer",
+  "title": "Giving it back, from where you took it",
+  "objective": "Show that defer runs when the scope ends, so the giving-back sits beside the taking and still happens.",
+  "concepts": ["allocation", "free", "ownership", "pointer"],
+  "difficulty": 3,
+  "requires": ["10-new-and-free"],
+  "entry": "start.odin",
+  "assertions": [
+    { "id": "A1", "at": "final", "expr": "frees(1)" },
+    { "id": "A2", "at": "any", "expr": "value_of(\"node.value\") == \"7\"" },
+    { "id": "A3", "at": "final", "expr": "output_equals(\"7\\n\")" }
+  ],
+  "hints": ["hints.md"],
+  "expected_wall_ms": 3000
+}

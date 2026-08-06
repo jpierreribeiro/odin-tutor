@@ -428,15 +428,16 @@ frame panel incomplete.
 > `list`, `hint` — and the acceptance script gained a section for it so the same
 > gap cannot reopen silently.
 >
-> **Thirty exercises** as of 2026-08-06, on the curriculum's own ids:
+> **Thirty-one exercises** as of 2026-08-06, on the curriculum's own ids:
 > `01-values`, `02-control-flow`, `03-fixed-arrays`, `04-structs`, `05-pointers`,
 > `06-aliasing`, `07-frames`, `08-recursion`, `09-nested-structs`,
 > `10-new-and-free`, `11-lifetime`,
 > `12-slices`, `13-sub-slices`, `14-dynamic-arrays`, `15-strings`, `16-utf8`,
 > `17-enums`, `18-varargs`, `19-arenas`, `20-errors`, `21-or-return`,
 > `22-string-copy`, `23-struct-copy`, `24-parameters`, `25-in-place`,
-> `26-sorting`, `27-unions`, `28-soa`, `29-array-math`, `30-swizzle`. Every one
-> accepts its reference solution, rejects a plausible wrong one, and has a hint.
+> `26-sorting`, `27-unions`, `28-soa`, `29-array-math`, `30-swizzle`, `31-defer`.
+> Every one accepts its reference solution, rejects a plausible wrong one, and
+> has a hint.
 >
 > **Eleven of them print the same thing whether the answer is right or wrong**,
 > so only the picture separates them. That proportion is the point of the

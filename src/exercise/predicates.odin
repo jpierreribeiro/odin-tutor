@@ -323,6 +323,21 @@ apply :: proc(
 			return verdict_of(strings.contains(trace.detail, call.arguments[0] if len(call.arguments) > 0 else "")), trace.detail
 		}
 		return .Fail, "the program was not terminated by a signal"
+	case "frees":
+		// POSITIVE EVIDENCE OF DEATH, which is the one thing absence cannot
+		// give (ADR-011). `object_count(0)` says nothing about a leak: an
+		// unreachable object is absent from the picture exactly like a freed
+		// one, and that is why `defer free(...)` could not be an exercise
+		// before this predicate existed.
+		wanted, ok := strconv.parse_int(call.arguments[0] if len(call.arguments) > 0 else "")
+		if !ok {
+			return .Undetermined, "frees takes a number"
+		}
+		total := 0
+		for s in trace.steps {
+			total += len(s.died)
+		}
+		return verdict_of(total == wanted), fmt.tprintf("%d storages were given back", total)
 	case "object_count":
 		wanted, ok := strconv.parse_int(call.arguments[0] if len(call.arguments) > 0 else "")
 		if !ok {

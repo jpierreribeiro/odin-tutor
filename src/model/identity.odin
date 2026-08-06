@@ -84,6 +84,18 @@ registry_destroy :: proc(r: ^Registry) {
 //
 // It never compares contents. Two objects with equal contents and different
 // storage get different identities. See SPEC-MEM-004, REQ-MEM-006.
+// identity_of looks up an identity WITHOUT minting one.
+//
+// `identity_for` mints on a miss, which is right when an object has just been
+// observed and wrong when asking "what used to be here?". A death at an address
+// nothing was ever recorded at is not a death of something; it is a free of
+// memory this tool never saw, and inventing an identity for it would put an
+// object on the screen that never existed.
+identity_of :: proc(r: ^Registry, key: Key) -> (Id, bool) {
+	id, found := r.assigned[key]
+	return id, found
+}
+
 identity_for :: proc(r: ^Registry, key: Key) -> Id {
 	if id, found := r.assigned[key]; found {
 		return id

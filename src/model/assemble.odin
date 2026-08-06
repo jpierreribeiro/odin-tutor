@@ -251,7 +251,23 @@ build_step :: proc(
 	// A death the program reported, before any identity is minted for this step.
 	// Positive evidence, and it needs no guard: ADR-011's caution is about
 	// ABSENCE, and this is not absence.
+	//
+	// The identity that WAS there is looked up before the epoch moves, and
+	// looked up WITHOUT minting: a free at an address this tool never observed
+	// is a free of memory it never drew, and inventing an identity for it would
+	// put an object on the screen that never existed.
+	died := make([dynamic]Id, allocator)
 	for address in record.freed {
+		if type_name, seen := a.registry.last_type[address]; seen {
+			if id, found := identity_of(&a.registry, Key{
+				kind      = .Object,
+				address   = address,
+				type_name = type_name,
+				epoch     = epoch_for(&a.registry, address, type_name),
+			}); found {
+				append(&died, id)
+			}
+		}
 		advance_epoch_on_free(&a.registry, address)
 	}
 
@@ -365,6 +381,7 @@ build_step :: proc(
 		frames      = frames[:],
 		entities    = entities,
 		removed     = removed,
+		died        = died[:],
 		stdout_len  = record.stdout_len,
 		truncations = truncations[:],
 	}

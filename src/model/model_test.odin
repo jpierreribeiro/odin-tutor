@@ -934,3 +934,56 @@ an_opaque_value_is_not_an_object :: proc(t: ^testing.T) {
 		testing.expect_value(t, f.text, "…")
 	}
 }
+
+@(test)
+a_reported_free_is_carried_into_the_trace :: proc(t: ^testing.T) {
+	// ADR-016. `removed` cannot answer "did this leak": an object leaves the
+	// picture when it is freed, when the last name for it goes out of scope,
+	// and when a budget cuts the frame holding it. `died` is the one the
+	// program stated, and it is what makes `defer free(...)` teachable.
+	ADDRESS :: 0x5000
+	object := tutor_obs.Value {
+		state = .Valid, kind = .Struct, type_name = "struct main::Node",
+		address = ADDRESS,
+		members = {{name = "value", value = scalar("7")}},
+	}
+	seen := tutor_obs.Record {
+		index = 0, file = "m.odin", line = 1,
+		frames = {one_frame({{name = "node", value = object}})},
+		objects = {{address = ADDRESS, value = object}},
+	}
+	gone := tutor_obs.Record {
+		index = 1, file = "m.odin", line = 2,
+		frames = {one_frame({})},
+		freed = {ADDRESS},
+	}
+
+	a: Assembly
+	assert(assembly_init(&a) == nil)
+	defer assembly_destroy(&a)
+	trace, err := assemble(&a, stream_of({seen, gone}))
+	testing.expect_value(t, err, Build_Error.None)
+
+	testing.expect_value(t, len(trace.steps[0].died), 0)
+	testing.expect_value(t, len(trace.steps[1].died), 1)
+	testing.expect_value(t, trace.steps[1].died[0], trace.steps[0].entities[0].id)
+}
+
+@(test)
+a_free_of_something_never_seen_names_nothing :: proc(t: ^testing.T) {
+	// The identity is looked up, never minted. A free at an address this tool
+	// never observed is a free of memory it never drew, and inventing an
+	// identity would put an object on the screen that never existed.
+	record := tutor_obs.Record {
+		index = 0, file = "m.odin", line = 1,
+		frames = {one_frame({})},
+		freed = {0x9999},
+	}
+
+	a: Assembly
+	assert(assembly_init(&a) == nil)
+	defer assembly_destroy(&a)
+	trace, err := assemble(&a, stream_of({record}))
+	testing.expect_value(t, err, Build_Error.None)
+	testing.expect_value(t, len(trace.steps[0].died), 0)
+}

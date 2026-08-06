@@ -90,6 +90,11 @@ Step :: struct {
 	entities: []Entity     `json:"entities"`,
 	// removed names entities that left the picture, at a delta only.
 	removed:  []Id         `json:"removed,omitempty"`,
+	// died names the identities the program RETURNED TO THE ALLOCATOR at this
+	// step. It is the one piece of positive evidence of death this model has:
+	// `removed` means "no longer reachable", which ADR-011 says is not evidence
+	// of anything, and `died` means "the program said so".
+	died:     []Id         `json:"died,omitempty"`,
 	stdout_len: int        `json:"stdout_len"`,
 	truncations: []Truncation `json:"truncations,omitempty"`,
 }

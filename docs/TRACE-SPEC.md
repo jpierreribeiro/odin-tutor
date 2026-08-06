@@ -121,6 +121,24 @@ the class of bug it invites.
 ```
 
 <a id="spec-trace-004"></a>
+<a id="spec-trace-006"></a>
+### SPEC-TRACE-006 — A step carries the deaths the program reported
+`died` names the identities the program returned to the allocator at that step.
+It is optional and absent when nothing died, so it is not a version change
+([SPEC-TRACE-070](#spec-trace-070)).
+
+It exists because `removed` cannot answer the question. `removed` means "no
+longer in the picture", which happens when an object is freed, when the last
+name for it goes out of scope, and when a budget cuts the frame holding it —
+[ADR-011](decisions/ADR-011-absence-is-not-evidence.md) is the ruling that those
+are not the same fact. `died` is the one the program stated.
+
+An identity is looked up, never minted: a free at an address the tool never
+observed names nothing, because inventing an identity for it would put an object
+on the screen that never existed. See
+[ADR-016](decisions/ADR-016-a-free-is-evidence.md).
+
+<a id="spec-trace-004"></a>
 ### SPEC-TRACE-004 — `outcome` describes the program, not the tool
 `outcome` says how the *target program* ended. A failure of the tool appears in
 `errors`, never here. See [REQ-ERR-001](REQUIREMENTS.md#req-err-001).

@@ -121,6 +121,23 @@ Only collections whose elements the adapter records have members: slices,
 dynamic arrays and strings do, and a fixed array of scalars is currently
 recorded as one compact text instead ([R-26](RISKS.md#r-26)).
 
+<a id="spec-val-027"></a>
+### SPEC-VAL-027 — `frees(n)` asks what the program gave back
+`frees(n)` is true when exactly `n` storages were returned to the allocator over
+the whole run. It reads the deaths the adapter observed on the free path, which
+the trace carries per step ([ADR-016](decisions/ADR-016-a-free-is-evidence.md)).
+
+*Rationale:* `object_count(0)` cannot answer "did this leak". An object is
+absent from the picture when it was freed, when the last name for it went out of
+scope, and when a budget cut the frame holding it —
+[ADR-011](decisions/ADR-011-absence-is-not-evidence.md) is precisely the ruling
+that those are not the same fact. A free reported by the program is the only
+positive evidence, and this is how an exercise asks for it.
+
+It counts what was REPORTED. Memory freed through an allocator the adapter does
+not break on is not counted, and that is a false negative against the student —
+see the closing section of ADR-016.
+
 ### Identity and relationship
 
 | Predicate | True when |
