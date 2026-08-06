@@ -1,0 +1,16 @@
+{
+  "id": "22-string-copy",
+  "title": "Copying a string does not copy its bytes",
+  "objective": "Show that assigning a string hands over a second view of the same bytes, not a second set of them.",
+  "concepts": ["string", "shared-storage", "aliasing", "copy"],
+  "difficulty": 2,
+  "requires": ["15-strings"],
+  "entry": "start.odin",
+  "assertions": [
+    { "id": "A1", "at": "any", "expr": "shares_storage(\"texto\", \"visto\")" },
+    { "id": "A2", "at": "any", "expr": "length_of(\"visto\") == 3" },
+    { "id": "A3", "at": "final", "expr": "output_equals(\"3 3\\n\")" }
+  ],
+  "hints": ["hints.md"],
+  "expected_wall_ms": 3000
+}

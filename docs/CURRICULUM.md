@@ -36,8 +36,9 @@ nothing. Pointers do, because "two names, one object" is a sentence in a
 reference and a visible fact on the screen.
 
 **The strongest exercises are the ones where the printed output is IDENTICAL for
-the right and the wrong answer.** Five of the twenty are built that way on
-purpose: `13-sub-slices`, `17-enums`, `18-varargs`, `19-arenas`, and `20-errors`.
+the right and the wrong answer.** Eight of the twenty-two are built that way on
+purpose: `13-sub-slices`, `17-enums`, `18-varargs`, `19-arenas`, `20-errors`,
+`21-or-return`, `22-string-copy` and `24-parameters`.
 Every test that compares printed text accepts both programs; only the picture
 separates them. That is the whole argument for this project in one screen.
 
@@ -45,7 +46,7 @@ separates them. That is the whole argument for this project in one screen.
 
 ## 2. Mapping
 
-Twenty exercises, against the overview's own section names.
+Twenty-two exercises, against the overview's own section names.
 
 | Overview section | Exercise | What the picture adds |
 |---|---|---|
@@ -64,14 +65,16 @@ Twenty exercises, against the overview's own section names.
 | `string` type, string iteration | `15-strings`, `16-utf8` | A string as `{data, len}`, and bytes against characters. |
 | Multiple results | `20-errors` | The failure as a second slot, not as prose. |
 | `or_return` | `21-or-return` | The error leaving on its own, instead of a zero that looks like an answer. |
+| `string` type conversions | `22-string-copy` | Assigning a string hands over a second view of the same bytes; `strings.clone` makes a second set. Both print the same lengths. |
+| Procedures: parameters | `24-parameters` | A parameter is a copy until you pass a pointer. The wrong answer doubles at the call site and prints the same number. |
 
 ---
 
 ## 3. What will not become an exercise, and why
 
 Each line below was **tried and probed**, not assumed. This section exists so
-that "there are only twenty" reads as a decision with reasons rather than as a
-gap.
+that "there are only twenty-two" reads as a decision with reasons rather than
+as a gap.
 
 | Overview section | Why not |
 |---|---|
@@ -80,6 +83,9 @@ gap.
 | Nested structs | **Withheld because the picture is currently WRONG** — two fields of a nested struct are drawn as one shared storage ([R-23](RISKS.md#r-23)). The exercise is written and will land when that is fixed. |
 | `defer` | A leak is invisible here by construction: absence from the reachable set is not evidence of anything ([ADR-011](decisions/ADR-011-absence-is-not-evidence.md)), and `defer`'s ordering is an output fact. The picture adds nothing the text does not say. |
 | `#soa` | Blocked by the same defect as nested structs ([R-23](RISKS.md#r-23)): `x` and `y` resolve to one identity. |
+| Copy versus reference on locals | **Withheld: the picture is WRONG the other way** ([R-25](RISKS.md#r-25)). A pointer to a local is drawn as a second object holding equal values, so `not_alias` reports the opposite of the truth. Written, and waiting. |
+| Array and slice CONTENTS — by-reference loops, sorting in place, array arithmetic, `append` moving its storage | Not blocked by a defect but by the vocabulary: [VALIDATION-SPEC.md](VALIDATION-SPEC.md) can count elements and compare lengths, and cannot yet ask what the third element IS. One predicate — an element accessor — turns this row into about six exercises. |
+| `distinct` types | Probed: a distinct scalar renders exactly like its base type, so the picture cannot show the difference the type system makes. |
 | Implicit context | Filtered out of the picture on purpose. |
 | Comments, packages, attributes, build tags, foreign, calling conventions, `when` | Prose, tooling, or compile-time. Nothing to see in memory. |
 | Parametric polymorphism, bit sets, `bit_field`, matrices | Marginal. The picture shows the concrete instance, which the text already told you. Candidates if the course ever needs more. |

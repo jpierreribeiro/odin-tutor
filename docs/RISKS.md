@@ -807,6 +807,54 @@ what it can read, and this is a named hole.
 
 ---
 
+<a id="r-25"></a>
+### R-25 — A pointer to a LOCAL draws that local's storage a second time
+**Class:** BLOCKING for the picture's promise · **Status: OPEN, found 2026-08-06**
+
+The sibling of [R-23](#r-23), and the opposite mistake. There, two objects were
+drawn as one. Here, one object is drawn as two.
+
+```odin
+a := Ponto{x = 1, y = 2}
+b := &a           // ONE Ponto exists. `b` is its address.
+b.x = 9
+
+//   a -> [2]
+//   b -> [3]
+//   [2] struct main::Ponto      [3] struct main::Ponto
+//       x = 9                       x = 9
+//       y = 2                       y = 2
+```
+
+Two entries, two identities, one storage. The values agree because the tool read
+the same bytes twice, so the screen is self-consistent and still says something
+false: that `a` and `b` are separate objects which happen to hold equal values.
+
+A student reading it would conclude that assigning a struct and taking its
+address produce the same picture. They produce opposite pictures, and telling
+them apart is the whole subject of `06-aliasing`.
+
+**Why no existing exercise caught it.** Every exercise that involves a pointer
+points at a HEAP allocation (`new`), where the local IS the pointer and only one
+entity is ever produced. A pointer to a local was never traced.
+
+**Suspected cause.** Identity is meant to be a function of address and epoch
+([SPEC-MEM-002](MEMORY-MODEL.md#spec-mem-002),
+[SPEC-MEM-040](MEMORY-MODEL.md#spec-mem-040)). A storage reached directly as a
+frame variable and the same storage reached through a pointer are not being
+unified into one identity.
+
+**What it blocks.** `23-struct-copy` — "assigning a struct copies it" — was
+written, failed to distinguish its own wrong answer, and is withheld. So is any
+exercise about copy-versus-reference on locals, which is a large part of what a
+beginner needs to understand about a manual-memory language.
+
+**What must not be done meanwhile:** nothing that hides it. `not_alias` and
+`not_shares_storage` both report the wrong answer here, and no exercise may lean
+on them for locals until this is fixed.
+
+---
+
 ## 4. Risks deliberately not carried
 
 | Not a risk here | Why |

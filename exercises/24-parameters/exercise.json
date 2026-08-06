@@ -1,0 +1,15 @@
+{
+  "id": "24-parameters",
+  "title": "A parameter is a copy until you pass a pointer",
+  "objective": "Show that a procedure cannot change its caller's variable unless it is handed the address of it.",
+  "concepts": ["procedure", "parameter", "pointer", "mutation", "frame"],
+  "difficulty": 2,
+  "requires": ["05-pointers", "07-frames"],
+  "entry": "start.odin",
+  "assertions": [
+    { "id": "A1", "at": "any", "expr": "value_of(\"total\") == \"6\"" },
+    { "id": "A2", "at": "final", "expr": "output_equals(\"6\\n\")" }
+  ],
+  "hints": ["hints.md"],
+  "expected_wall_ms": 3000
+}
