@@ -496,6 +496,46 @@ the validator can be tested through the plain renderer alone.
 
 ---
 
+## Phase 5b — the shell the loop is missing
+
+Not a new capability. The loop works: it picks the next unfinished exercise,
+watches, re-runs on save, records progress, and advances. What is missing is
+everything AROUND it, and the gap was found by putting `rustlings` side by side
+with it rather than by reading this document.
+
+The seven differences, in the order they are worth closing:
+
+| Missing | Why it matters |
+|---|---|
+| `odin-tutor init` | The student edits inside the cloned repository today, so their work and the course's history are the same tree and `git status` is never clean. `rustlings init` copies the exercises into a directory of the student's own. **This is the one that changes how the tool is used, not how it looks.** |
+| An interactive loop that reads keys | `list` and `hint` are separate commands run from another shell. `rustlings` reads one keypress inside the loop: `n` next, `h` hint, `l` list, `c` check all, `x` reset, `q` quit. |
+| A progress bar and the current path, always visible | `Progress: [##>-----] 3/94` under every screen, with the exercise path beneath it. The tool prints a header once and then nothing. |
+| A key bar | The six keys, on screen, so nothing has to be remembered. |
+| `reset` | Put an exercise back to its `start.odin`. There is no way back today except `git checkout`, which the student should not have to know. |
+| A pointer to the solution on success | `solution.odin` exists in every exercise and is never mentioned. `rustlings` prints `Solution for comparison: solutions/...`. |
+| A first-run explanation | Four short paragraphs on what an exercise is and how the loop behaves, once. |
+
+### One difference that is a DECISION, not a gap
+`rustlings` does not advance by itself: it says "done" and waits for `n`, so the
+student can keep experimenting with a solved exercise. This tool advances
+immediately. That is a choice about who decides when a lesson is finished, and it
+should be made deliberately rather than inherited from whichever was easier to
+write.
+
+### What must not be lost while doing this
+The interactive screen formats nothing of its own
+([SPEC-TUI-051](TUI-SPEC.md#spec-tui-051)) — `tutor_render` is the single
+formatter, and the step player already obeys that. A progress bar and a key bar
+are chrome around a rendered screen, not a second renderer.
+
+And every acceptance criterion here belongs in
+[`tests/phase5-acceptance.sh`](../tests/phase5-acceptance.sh) as it lands. The
+loop itself was missing once while all four of Phase 5's criteria passed; the
+section that check gained exists so that cannot recur, and it only holds if new
+shell gets checks too.
+
+---
+
 ## Version 1
 
 Version 1 is Phases 0 through 5 on Linux x86-64, with:
