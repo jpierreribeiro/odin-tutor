@@ -3,7 +3,7 @@
 [![check](https://github.com/jpierreribeiro/odin-tutor/actions/workflows/check.yml/badge.svg)](https://github.com/jpierreribeiro/odin-tutor/actions/workflows/check.yml)
 [![nightly](https://github.com/jpierreribeiro/odin-tutor/actions/workflows/nightly.yml/badge.svg)](https://github.com/jpierreribeiro/odin-tutor/actions/workflows/nightly.yml)
 
-Twenty-two tiny broken Odin programs. Fix them, and learn how memory actually
+Twenty-four tiny broken Odin programs. Fix them, and learn how memory actually
 behaves while you do.
 
 **Recommended in parallel with the [official Odin overview](https://odin-lang.org/docs/overview/).**
@@ -138,7 +138,7 @@ never type an exercise name.
 Under every screen:
 
 ```
-Progress: [#####>----------------------------------]  2/22
+Progress: [#####>----------------------------------]  2/24
 Current exercise: exercises/03-fixed-arrays/start.odin
 
 h:hint / t:show me / l:list / c:check all / x:reset / q:quit ?
@@ -191,12 +191,14 @@ Each one accompanies a section of the
 | `21-or-return` | The error leaves on its own instead of becoming a zero |
 | `22-string-copy` | Copying a string does not copy its bytes |
 | `24-parameters` | A parameter is a copy until you pass a pointer |
+| `25-in-place` | A by-reference loop changes the thing, not a copy of it |
+| `26-sorting` | Sorting in place reorders the buffer everyone else can see |
 
-**Eight of them print the same thing whether you are right or wrong.** That is
+**Ten of them print the same thing whether you are right or wrong.** That is
 deliberate: `13-sub-slices`, `17-enums`, `18-varargs`, `19-arenas`, `20-errors`,
-`21-or-return`, `22-string-copy` and `24-parameters` each have a plausible wrong
-answer that passes every output check ever written. Only the memory tells them
-apart.
+`21-or-return`, `22-string-copy`, `24-parameters`, `25-in-place` and
+`26-sorting` each have a plausible wrong answer that passes every output check
+ever written. Only the memory tells them apart.
 
 More are planned. [`docs/CURRICULUM.md`](docs/CURRICULUM.md) maps every one to
 its overview section — and lists what will **not** become an exercise, with the

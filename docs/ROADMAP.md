@@ -428,7 +428,7 @@ frame panel incomplete.
 > `list`, `hint` — and the acceptance script gained a section for it so the same
 > gap cannot reopen silently.
 >
-> **Twenty-two exercises** as of 2026-08-06, on the curriculum's own ids: `01-values`,
+> **Twenty-four exercises** as of 2026-08-06, on the curriculum's own ids: `01-values`,
 > `02-control-flow`, `03-fixed-arrays`, `04-structs`, `05-pointers`, `06-aliasing`, `07-frames`, `08-recursion`,
 > `10-new-and-free`, `11-lifetime`, `12-slices`, `13-sub-slices`,
 > `14-dynamic-arrays`, `15-strings`, `16-utf8`, `20-errors`. Every one accepts its reference solution, rejects a plausible wrong

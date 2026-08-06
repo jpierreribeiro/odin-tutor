@@ -36,9 +36,10 @@ nothing. Pointers do, because "two names, one object" is a sentence in a
 reference and a visible fact on the screen.
 
 **The strongest exercises are the ones where the printed output is IDENTICAL for
-the right and the wrong answer.** Eight of the twenty-two are built that way on
+the right and the wrong answer.** Ten of the twenty-four are built that way on
 purpose: `13-sub-slices`, `17-enums`, `18-varargs`, `19-arenas`, `20-errors`,
-`21-or-return`, `22-string-copy` and `24-parameters`.
+`21-or-return`, `22-string-copy`, `24-parameters`, `25-in-place` and
+`26-sorting`.
 Every test that compares printed text accepts both programs; only the picture
 separates them. That is the whole argument for this project in one screen.
 
@@ -46,7 +47,7 @@ separates them. That is the whole argument for this project in one screen.
 
 ## 2. Mapping
 
-Twenty-two exercises, against the overview's own section names.
+Twenty-four exercises, against the overview's own section names.
 
 | Overview section | Exercise | What the picture adds |
 |---|---|---|
@@ -67,13 +68,15 @@ Twenty-two exercises, against the overview's own section names.
 | `or_return` | `21-or-return` | The error leaving on its own, instead of a zero that looks like an answer. |
 | `string` type conversions | `22-string-copy` | Assigning a string hands over a second view of the same bytes; `strings.clone` makes a second set. Both print the same lengths. |
 | Procedures: parameters | `24-parameters` | A parameter is a copy until you pass a pointer. The wrong answer doubles at the call site and prints the same number. |
+| `for` by reference | `25-in-place` | `for &n` writes into the slice; the by-value version computes on the way to the screen and changes nothing. |
+| Sort slices | `26-sorting` | Sorting in place reorders the buffer every other name shares; sorting a clone leaves the original as it was. |
 
 ---
 
 ## 3. What will not become an exercise, and why
 
 Each line below was **tried and probed**, not assumed. This section exists so
-that "there are only twenty-two" reads as a decision with reasons rather than
+that "there are only twenty-four" reads as a decision with reasons rather than
 as a gap.
 
 | Overview section | Why not |
@@ -84,7 +87,7 @@ as a gap.
 | `defer` | A leak is invisible here by construction: absence from the reachable set is not evidence of anything ([ADR-011](decisions/ADR-011-absence-is-not-evidence.md)), and `defer`'s ordering is an output fact. The picture adds nothing the text does not say. |
 | `#soa` | Blocked by the same defect as nested structs ([R-23](RISKS.md#r-23)): `x` and `y` resolve to one identity. |
 | Copy versus reference on locals | **Withheld: the picture is WRONG the other way** ([R-25](RISKS.md#r-25)). A pointer to a local is drawn as a second object holding equal values, so `not_alias` reports the opposite of the truth. Written, and waiting. |
-| Array and slice CONTENTS — by-reference loops, sorting in place, array arithmetic, `append` moving its storage | Not blocked by a defect but by the vocabulary: [VALIDATION-SPEC.md](VALIDATION-SPEC.md) can count elements and compare lengths, and cannot yet ask what the third element IS. One predicate — an element accessor — turns this row into about six exercises. |
+| Fixed-array CONTENTS — array arithmetic, swizzles | The element accessor ([SPEC-VAL-026](VALIDATION-SPEC.md#spec-val-026)) unblocked slices and dynamic arrays, and `25-in-place` and `26-sorting` came straight out of it. A fixed array of scalars is still recorded as one compact text with no elements ([R-26](RISKS.md#r-26)), so exercises about contents are written against slices for now. |
 | `distinct` types | Probed: a distinct scalar renders exactly like its base type, so the picture cannot show the difference the type system makes. |
 | Implicit context | Filtered out of the picture on purpose. |
 | Comments, packages, attributes, build tags, foreign, calling conventions, `when` | Prose, tooling, or compile-time. Nothing to see in memory. |

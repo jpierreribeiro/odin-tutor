@@ -855,6 +855,30 @@ on them for locals until this is fixed.
 
 ---
 
+<a id="r-26"></a>
+### R-26 — A fixed array of scalars is recorded as text, not as elements
+**Class:** MEDIUM · **Status: OPEN, found 2026-08-06**
+
+A slice records its elements as members named `[0]`, `[1]`, `[2]`. A fixed array
+of scalars records `"text": "{2, 4, 6}"` and no members at all.
+
+The picture reads the same to a person. It does not to an assertion: with
+[SPEC-VAL-026](VALIDATION-SPEC.md#spec-val-026) an exercise can ask what
+`marks[2]` is when `marks` is a slice, and cannot when it is a `[3]int`.
+
+**Consequence.** Exercises about array contents have to be written against
+slices. That is not a bad constraint — slices are the shape a student meets most
+— but it is a constraint nobody chose, and an exercise author will hit it as a
+silent `undetermined` rather than as a message.
+
+**The fix is in the adapter**, which already emits elements for anything with a
+`data` pointer and a length. A fixed array has neither; it has a static length in
+its type, which is the very fact `03-fixed-arrays` teaches. Emitting members for
+it would change the observation stream, so it changes the conformance goldens
+and belongs in a change that regenerates them deliberately.
+
+---
+
 ## 4. Risks deliberately not carried
 
 | Not a risk here | Why |

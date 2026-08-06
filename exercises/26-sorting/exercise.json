@@ -1,0 +1,16 @@
+{
+  "id": "26-sorting",
+  "title": "Sorting the buffer you were given",
+  "objective": "Show that sorting in place reorders the slice everyone else can see, while sorting a copy leaves the original untouched.",
+  "concepts": ["slice", "shared-storage", "mutation", "copy"],
+  "difficulty": 3,
+  "requires": ["25-in-place", "13-sub-slices"],
+  "entry": "start.odin",
+  "assertions": [
+    { "id": "A1", "at": "any", "expr": "value_of(\"nums[0]\") == \"1\"" },
+    { "id": "A2", "at": "any", "expr": "value_of(\"nums[2]\") == \"9\"" },
+    { "id": "A3", "at": "final", "expr": "output_equals(\"1 4 9\\n\")" }
+  ],
+  "hints": ["hints.md"],
+  "expected_wall_ms": 3000
+}

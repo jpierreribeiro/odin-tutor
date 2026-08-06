@@ -187,3 +187,40 @@ progress_belongs_to_the_students_own_course :: proc(t: ^testing.T) {
 		"and the repository layout is not",
 	)
 }
+
+// --- naming an element ---------------------------------------------------
+
+@(test)
+an_index_is_a_hop_like_any_other :: proc(t: ^testing.T) {
+	// The adapter already names elements `[2]`. Before this, the only way to
+	// reach one was to write the bracket after a dot, which nobody guesses.
+	testing.expect_value(t, len(hops("marks[2]")), 2)
+	testing.expect_value(t, hops("marks[2]")[0], "marks")
+	testing.expect_value(t, hops("marks[2]")[1], "[2]")
+
+	deep := hops("casa.cantos[1].x")
+	testing.expect_value(t, len(deep), 4)
+	testing.expect_value(t, deep[1], "cantos")
+	testing.expect_value(t, deep[2], "[1]")
+	testing.expect_value(t, deep[3], "x")
+}
+
+@(test)
+a_path_without_brackets_is_unchanged :: proc(t: ^testing.T) {
+	// The old syntax has to keep working: every exercise written before this
+	// uses it, and `head.next.next` is still how a chain is walked.
+	same := hops("head.next.next")
+	testing.expect_value(t, len(same), 3)
+	testing.expect_value(t, same[2], "next")
+	testing.expect_value(t, len(hops("total")), 1)
+}
+
+@(test)
+an_unbalanced_bracket_resolves_to_nothing_rather_than_a_guess :: proc(t: ^testing.T) {
+	// An authoring mistake. It must not become "element 2 of something", and it
+	// must not crash the walk — the assertion reports `undetermined` with the
+	// expression in it, which is what sends the author back to the manifest.
+	broken := hops("marks[2")
+	testing.expect_value(t, len(broken), 1)
+	testing.expect_value(t, broken[0], "marks")
+}

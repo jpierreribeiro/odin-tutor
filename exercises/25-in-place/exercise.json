@@ -1,0 +1,17 @@
+{
+  "id": "25-in-place",
+  "title": "Changing the thing, not a copy of it",
+  "objective": "Show that a by-reference loop writes into the slice you gave it, while a by-value one computes and throws the result away.",
+  "concepts": ["slice", "iteration", "mutation", "loop", "reference"],
+  "difficulty": 2,
+  "requires": ["12-slices", "05-pointers"],
+  "entry": "start.odin",
+  "assertions": [
+    { "id": "A1", "at": "any", "expr": "value_of(\"nums[0]\") == \"2\"" },
+    { "id": "A2", "at": "any", "expr": "value_of(\"nums[2]\") == \"6\"" },
+    { "id": "A3", "at": "any", "expr": "length_of(\"nums\") == 3" },
+    { "id": "A4", "at": "final", "expr": "output_equals(\"2 4 6\\n\")" }
+  ],
+  "hints": ["hints.md"],
+  "expected_wall_ms": 3000
+}

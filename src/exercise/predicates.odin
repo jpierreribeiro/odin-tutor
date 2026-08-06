@@ -54,7 +54,7 @@ resolve :: proc(
 		return {}
 	}
 
-	parts := strings.split(rest, ".", context.temp_allocator)
+	parts := hops(rest, context.temp_allocator)
 	if len(parts) == 0 {
 		return {}
 	}
@@ -114,6 +114,50 @@ resolve :: proc(
 		}
 	}
 	return subject
+}
+
+// hops splits a path into the steps a walk takes, so that `marks[2]` reaches
+// the same member as `marks.[2]`.
+//
+// An element is ALREADY a member, named `[2]` by the adapter, and before this
+// the only way to name one was to write that bracket after a dot — which nobody
+// guesses. The vocabulary could count elements and compare lengths, and could
+// not ask what the third element IS, so a whole class of exercise was
+// unwritable: a loop that doubles in place, a sort that sorts the buffer it was
+// given, an append that moved its storage.
+//
+//	marks[2]        -> ["marks", "[2]"]
+//	casa.cantos[1]  -> ["casa", "cantos", "[1]"]
+hops :: proc(path: string, allocator := context.temp_allocator) -> []string {
+	out := make([dynamic]string, allocator)
+	start := 0
+	for i := 0; i < len(path); i += 1 {
+		switch path[i] {
+		case '.':
+			if i > start {
+				append(&out, path[start:i])
+			}
+			start = i + 1
+		case '[':
+			if i > start {
+				append(&out, path[start:i])
+			}
+			closing := strings.index_byte(path[i:], ']')
+			if closing < 0 {
+				// An unbalanced bracket is an AUTHORING mistake, and the path
+				// simply does not resolve — which reports `undetermined` with
+				// the expression in it rather than guessing an index.
+				return out[:]
+			}
+			append(&out, path[i:i + closing + 1])
+			i += closing
+			start = i + 1
+		}
+	}
+	if start < len(path) {
+		append(&out, path[start:])
+	}
+	return out[:]
 }
 
 entity_by_id :: proc(entities: []tutor_model.Entity, id: tutor_model.Id) -> (tutor_model.Entity, bool) {

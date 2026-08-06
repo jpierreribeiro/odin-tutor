@@ -93,6 +93,34 @@ nothing makes its assertion `undetermined`, never `fail`.
 *Rationale:* a name that does not exist may mean the student named it
 differently. That is not evidence of a wrong picture.
 
+<a id="spec-val-026"></a>
+### SPEC-VAL-026 — An element is named by its index
+A path may index a collection: `marks[2]` reaches the third element, and
+`casa.cantos[1].x` reaches a field of an element. An index is a hop like a field
+name, because that is exactly what it already was — the adapter names elements
+`[0]`, `[1]`, `[2]` and the walk matched them by name all along.
+
+| Path | Reaches |
+|---|---|
+| `marks` | the collection |
+| `marks[2]` | its third element |
+| `casa.cantos[1].x` | a field, of an element, of a field |
+
+An unbalanced bracket resolves to nothing, so the assertion is `undetermined`
+and names the expression. It is an authoring mistake, and guessing an index from
+a malformed path would hide it.
+
+*Rationale:* without this, the vocabulary could count elements and compare
+lengths and could not ask **what the third element is**. That made a whole class
+of exercise unwritable — a loop that doubles in place, a sort that sorts the
+buffer it was given, an append that moved its storage — because in every one of
+them the right and the wrong answer print the same thing and differ only in what
+the collection now holds.
+
+Only collections whose elements the adapter records have members: slices,
+dynamic arrays and strings do, and a fixed array of scalars is currently
+recorded as one compact text instead ([R-26](RISKS.md#r-26)).
+
 ### Identity and relationship
 
 | Predicate | True when |
