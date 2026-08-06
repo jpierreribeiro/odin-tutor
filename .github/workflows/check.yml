@@ -1,0 +1,116 @@
+name: check
+
+# Every change, on a machine nobody has configured.
+#
+# The point is not that the tests pass — they pass on the author's machine, and
+# that is exactly the claim worth doubting. The point is that a clean machine,
+# following the README, gets the same answer.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # FIRST, and on its own, because it is about the machine and not the code.
+  # If a trace fails and this is green, the tool is wrong. If this is red,
+  # nothing below it means anything. Two answers that must never arrive on the
+  # same line.
+  debuggable:
+    name: the runner can be traced on
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq gdb
+      - run: ./ci/debuggable.sh
+
+  check:
+    name: check.sh
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/toolchain
+        with:
+          odin: pinned
+          gdb: "false"
+      # A named python, so `pip install` is not a bet on how the runner image
+      # manages its system packages. check.sh SKIPS schema validation when
+      # jsonschema is missing, and a skip nobody notices is how a schema stops
+      # being checked.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install --quiet jsonschema
+      - run: ./check.sh
+
+  # One job per gate, in parallel, so a red X names the phase that broke rather
+  # than "the tests".
+  gate:
+    name: phase ${{ matrix.gate }} acceptance
+    needs: debuggable
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        gate: ["1", "2", "3", "4", "5", "6"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/toolchain
+        with:
+          odin: pinned
+      - run: ./tests/phase${{ matrix.gate }}-acceptance.sh
+
+  conformance:
+    name: adapter conformance
+    needs: debuggable
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/toolchain
+        with:
+          odin: pinned
+      - run: ./tests/adapter-conformance.sh
+
+  # macOS is NOT supported, and this job does not pretend otherwise. It checks
+  # the two things that are true there and were never verified: that everything
+  # which does not touch a debugger builds and passes its tests, and that the
+  # tool refuses with a NAMED error instead of crashing or drawing something.
+  #
+  # When Phase 7 starts, this is the job that already says how much of the
+  # distance is left.
+  macos:
+    name: macOS — builds, and fails by name
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/toolchain
+        with:
+          odin: pinned
+      - name: everything that does not need a debugger
+        run: |
+          export PATH="$ODIN_ROOT:$PATH"
+          for package in obs model render preflight toolchain exercise; do
+            odin check "src/$package" -no-entry-point -vet -strict-style
+            odin test "src/$package"
+          done
+          odin check src/tutor -vet -strict-style
+          odin build src/tutor -out:odin-tutor
+      - name: preflight refuses, and says why
+        run: |
+          export PATH="$ODIN_ROOT:$PATH"
+          if ./odin-tutor preflight > out.txt 2>&1; then
+            echo "preflight PASSED on a machine with no gdb. It must not." >&2
+            cat out.txt >&2
+            exit 1
+          fi
+          grep -q 'TOOLCHAIN_MISSING' out.txt || {
+            echo "preflight failed without a named error:" >&2
+            cat out.txt >&2
+            exit 1
+          }
+          cat out.txt

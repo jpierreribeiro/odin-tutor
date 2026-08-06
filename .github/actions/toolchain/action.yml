@@ -1,0 +1,44 @@
+name: toolchain
+description: Install Odin (cached) and, on Linux, gdb — the two things every job here needs.
+
+inputs:
+  odin:
+    description: Which Odin to install — `pinned`, `latest`, an index where 0 is newest, or a tag.
+    required: false
+    default: pinned
+  gdb:
+    description: Install gdb. Off for jobs that only build and test, so they are not slowed by it.
+    required: false
+    default: "true"
+
+outputs:
+  tag:
+    description: The Odin release tag that was installed.
+    value: ${{ steps.resolve.outputs.tag }}
+
+runs:
+  using: composite
+  steps:
+    # Resolved BEFORE the cache is consulted, because the tag is the cache key.
+    # `pinned` and `latest` both name a different toolchain over time, and a
+    # cache keyed on either WORD would freeze the very thing this project
+    # refuses to assume is constant (ADR-009).
+    - id: resolve
+      shell: bash
+      run: echo "tag=$(./ci/install-odin.sh --resolve '${{ inputs.odin }}')" >> "$GITHUB_OUTPUT"
+
+    - uses: actions/cache@v4
+      with:
+        path: ${{ runner.temp }}/odin
+        key: odin-${{ runner.os }}-${{ runner.arch }}-${{ steps.resolve.outputs.tag }}
+
+    - shell: bash
+      run: |
+        ./ci/install-odin.sh '${{ steps.resolve.outputs.tag }}' '${{ runner.temp }}/odin'
+        echo "ODIN_ROOT=${{ runner.temp }}/odin" >> "$GITHUB_ENV"
+
+    - if: inputs.gdb == 'true' && runner.os == 'Linux'
+      shell: bash
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install -y -qq gdb

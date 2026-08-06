@@ -1,0 +1,77 @@
+name: nightly
+
+# Does today's Odin still produce debug information this tool can read?
+#
+# The correctness of every picture depends on what the compiler emits, and that
+# is not a constant (ADR-009, SPEC-PLAT-030). Without this, a release of Odin
+# breaks the tool quietly: preflight sees an unlisted version, warns once, and
+# carries on drawing. This is the alarm that says WHICH DAY it changed.
+
+on:
+  schedule:
+    # 04:17 UTC. Not on the hour: everybody's cron is on the hour.
+    - cron: "17 4 * * *"
+  workflow_dispatch:
+    inputs:
+      odin:
+        description: A specific Odin release to try — `latest`, an index, or a tag.
+        required: false
+        default: latest
+
+jobs:
+  toolchain:
+    name: odin ${{ matrix.odin }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        # The three newest releases. Not just the newest: when the newest breaks
+        # something, the question immediately becomes "and the one before it?",
+        # and answering that from an archived run beats bisecting by hand.
+        odin: ${{ github.event.inputs.odin && fromJSON(format('["{0}"]', github.event.inputs.odin)) || fromJSON('["0","1","2"]') }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: toolchain
+        uses: ./.github/actions/toolchain
+        with:
+          odin: ${{ matrix.odin }}
+      - run: ./ci/debuggable.sh
+
+      # A named python, so `pip install` is not a bet on how the runner image
+      # manages its system packages. check.sh SKIPS schema validation when
+      # jsonschema is missing, and a skip nobody notices is how a schema stops
+      # being checked.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install --quiet jsonschema
+      - name: check.sh
+        run: ./check.sh
+
+      - name: every gate
+        run: |
+          for gate in 1 2 3 4 5 6; do
+            echo "=== phase $gate"
+            "./tests/phase$gate-acceptance.sh"
+          done
+          ./tests/adapter-conformance.sh
+
+      # The probe suite answers a different question from the gates: not "is the
+      # code right" but "does this toolchain support the model at all". Its
+      # report is the evidence a row in the compatibility table is allowed to
+      # rest on (SPEC-PLAT-031).
+      - name: probe this toolchain
+        if: always()
+        run: ./probes/run.sh --out "$RUNNER_TEMP/${{ steps.toolchain.outputs.tag }}.md"
+
+      # UPLOADED, never committed. A row in the table means a person read the
+      # report and vouched for it; a bot committing rows nightly would turn
+      # evidence back into decoration, which is the whole thing SPEC-PLAT-031
+      # exists to prevent.
+      - name: keep the report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: probe-${{ steps.toolchain.outputs.tag }}
+          path: ${{ runner.temp }}/${{ steps.toolchain.outputs.tag }}.md
+          if-no-files-found: warn

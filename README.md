@@ -1,5 +1,8 @@
 # odin-tutor
 
+[![check](https://github.com/jpierreribeiro/odin-tutor/actions/workflows/check.yml/badge.svg)](https://github.com/jpierreribeiro/odin-tutor/actions/workflows/check.yml)
+[![nightly](https://github.com/jpierreribeiro/odin-tutor/actions/workflows/nightly.yml/badge.svg)](https://github.com/jpierreribeiro/odin-tutor/actions/workflows/nightly.yml)
+
 Sixteen tiny broken Odin programs. Fix them, and learn how memory actually
 behaves while you do.
 
@@ -58,7 +61,7 @@ have that open beside them.
 
 | | |
 |---|---|
-| **Linux, x86-64** | On Windows, use WSL2. macOS is not supported yet. |
+| **Linux, x86-64** | On Windows, use WSL2. On macOS it builds and its tests pass, but it cannot trace yet — it needs a different debugger, and it tells you so instead of guessing ([why](docs/PLATFORM-SUPPORT.md#3-macos)). |
 | **The Odin compiler** | A recent build from [odin-lang.org](https://odin-lang.org/). |
 | **GDB, built with Python** | The default `gdb` package on Ubuntu and Fedora is. The tool runs its reader inside gdb. |
 
@@ -71,6 +74,13 @@ These exact combinations have been tested against the full probe suite:
 
 Anything else still runs. The tool checks your versions at startup and warns you
 once if it has not seen them before, rather than pretending it knows.
+
+Odin moves fast, and what this tool draws depends on the debug information your
+compiler emits. So a job runs every night against the **three newest Odin
+releases** — the whole test suite, every phase gate, and the probe suite that
+asks whether the toolchain supports the model at all. If a release of Odin
+breaks this, the failure has a date on it instead of turning up in your terminal
+first.
 
 ## Getting started
 

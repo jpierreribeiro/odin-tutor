@@ -1,0 +1,89 @@
+name: release
+
+# A student should not have to build a compiler toolchain to learn a language.
+#
+# The tarball is the whole tool: the executable, the script it runs inside gdb,
+# and the exercises — laid out so that the executable finds both of them beside
+# itself, which is the layout `init` and the adapter lookup already expect.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag to build a tarball for, without publishing it.
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  linux-amd64:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/toolchain
+        with:
+          odin: pinned
+
+      - id: name
+        run: |
+          tag="${{ github.event.inputs.tag || github.ref_name }}"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "dir=odin-tutor-$tag-linux-amd64" >> "$GITHUB_OUTPUT"
+
+      - name: build and assemble
+        run: |
+          export PATH="$ODIN_ROOT:$PATH"
+          odin build src/tutor -out:odin-tutor
+          out="${{ steps.name.outputs.dir }}"
+          mkdir -p "$out/adapter"
+          cp odin-tutor "$out/"
+          cp adapter/gdb_extractor.py "$out/adapter/"
+          cp -r exercises "$out/"
+          cp README.md LICENSE "$out/"
+          # The counter-examples are the acceptance script's, not the student's
+          # (SPEC-EX-052). They are also what `init` refuses to copy, so a
+          # tarball carrying them would disagree with the tool.
+          find "$out/exercises" -name 'wrong-*.odin' -delete
+          tar -czf "$out.tar.gz" "$out"
+
+      # The packaging risk is not "does it build" — it is whether the executable
+      # finds its adapter and its exercises once it is somewhere else. So this
+      # unpacks the artefact into a directory that has nothing to do with the
+      # checkout, and uses it exactly as the README tells a student to.
+      - name: use the tarball as a student would
+        run: |
+          work=$(mktemp -d)
+          tar -xzf "${{ steps.name.outputs.dir }}.tar.gz" -C "$work"
+          installed="$work/${{ steps.name.outputs.dir }}"
+          cd "$installed"
+
+          ./odin-tutor init "$work/course"
+          (cd "$work/course" && "$installed/odin-tutor" list | tail -3)
+
+          # A real trace, with the packaged adapter, from the packaged
+          # exercises. This is the step that would have caught a tarball whose
+          # gdb script was left behind.
+          export PATH="$ODIN_ROOT:$PATH"
+          sudo apt-get update -qq && sudo apt-get install -y -qq gdb
+          ./odin-tutor trace exercises/01-values/solution.odin "$work/t.json"
+          ./odin-tutor render "$work/t.json" 1 | head -5
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.name.outputs.dir }}
+          path: ${{ steps.name.outputs.dir }}.tar.gz
+
+      - name: publish
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.name.outputs.tag }}" \
+            --title "${{ steps.name.outputs.tag }}" \
+            --generate-notes \
+            "${{ steps.name.outputs.dir }}.tar.gz" ||
+          gh release upload "${{ steps.name.outputs.tag }}" \
+            "${{ steps.name.outputs.dir }}.tar.gz" --clobber

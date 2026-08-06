@@ -181,8 +181,34 @@ run report is committed under `fixtures/toolchain/`.
 <a id="spec-plat-032"></a>
 ### SPEC-PLAT-032 — A pinned version for continuous integration
 Continuous integration pins one combination. The pinned combination is the one
-the project claims to support. Other combinations are tested when a contributor
-supplies evidence.
+the project claims to support. The pin is
+[`ci/pinned-odin.txt`](../ci/pinned-odin.txt), one release tag, and moving it is
+a commit by a person with a probe report behind it
+([SPEC-PLAT-031](#spec-plat-031)).
+
+*Rationale:* a pull request must not go red because Odin released something
+yesterday. That attributes a toolchain change to whoever happened to push next,
+which is both wrong and the fastest way to teach a team to ignore a red mark.
+
+<a id="spec-plat-033"></a>
+### SPEC-PLAT-033 — Drift is asked about on a schedule, not on a change
+A scheduled job runs the whole suite, every phase gate, and the probe suite
+against the **three newest Odin releases**, unpinned. Its failure is the alarm
+that [ADR-009](decisions/ADR-009-toolchain-pinning.md) exists to raise: the day
+the compiler's debug information stopped supporting the model.
+
+Three releases rather than one, because when the newest breaks something the
+next question is always "and the one before it?", and answering that from an
+archived run beats bisecting by hand.
+
+Its probe reports are **uploaded, not committed**. A row in the table above
+means a person read the report and vouched for it; a job committing rows nightly
+would turn evidence back into decoration.
+
+*What this does not do:* it does not add a platform. macOS needs a second
+adapter (§3), and a schedule cannot write one. What runs there is §3's honest
+subset — everything that does not touch a debugger, plus the assertion that the
+tool refuses with a named error rather than crashing.
 
 ---
 
