@@ -366,6 +366,35 @@ The residual closes with the allocator event stream, in Phase 6.
 
 ## 8. Composite Odin types
 
+<a id="spec-mem-054"></a>
+### SPEC-MEM-054 — A union shows the variant its tag names, and only that one
+**Measured 2026-08-06.** An Odin union is a real union in debug information: a
+`tag`, beside one field per variant named `v1`, `v2`, … in declaration order.
+The tag is 1-based; 0 is `nil`.
+
+```
+type = union main::Value { u64 tag; int v1; f64 v2; }
+$1 = {tag = 1, v1 = 42, v2 = 2.0750757125332355e-322}
+```
+
+The picture reads the variant the tag names, as a single member named by its
+type:
+
+```
+  [2] union main::Value
+      int = 42
+```
+
+**The other variants are not shown.** Every one of them is live in the bytes and
+all but one are nonsense — the `2.07e-322` above is the integer 42 read as a
+float. Showing them would put garbage that looks like data on the screen, which
+is the one thing this tool exists not to do
+([ADR-008](decisions/ADR-008-unknown-over-false.md)).
+
+A `#raw_union` has no tag. Which variant is live is genuinely not knowable by
+reading, so it reports `unknown` with that as its reason rather than picking
+one.
+
 <a id="spec-mem-050"></a>
 <a id="spec-mem-053"></a>
 ### SPEC-MEM-053 — Map is not in the same class as slice and string

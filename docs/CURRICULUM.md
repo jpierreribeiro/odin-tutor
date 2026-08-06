@@ -47,14 +47,14 @@ separates them. That is the whole argument for this project in one screen.
 
 ## 2. Mapping
 
-Twenty-five exercises, against the overview's own section names.
+Twenty-seven exercises, against the overview's own section names.
 
 | Overview section | Exercise | What the picture adds |
 |---|---|---|
 | Hellope, Variable declarations | `01-values` | A variable exists before its line runs, and reads `not yet` rather than stack garbage. |
 | Control flow: `for`, `if` | `02-control-flow` | Stepping backward through a loop, one iteration at a time. |
 | Fixed arrays | `03-fixed-arrays` | The length is part of the type, not a number stored beside it. |
-| Structs | `04-structs` | Fields as named slots, read individually. |
+| Structs | `04-structs`, `09-nested-structs` | Fields as named slots, read individually — and a struct inside a struct, read all the way down. |
 | Pointers | `05-pointers`, `06-aliasing` | **The first place the picture is essential.** Two names showing `-> [7]` is what aliasing *is*. |
 | Procedures | `07-frames`, `08-recursion` | The frames column, and a recursion whose depth you can see. |
 | Enumerations | `17-enums` | A name is the value. The lookup-table version prints the same word and holds a `1`. |
@@ -65,6 +65,7 @@ Twenty-five exercises, against the overview's own section names.
 | Dynamic arrays | `14-dynamic-arrays` | Capacity against length, two numbers that differ. |
 | `string` type, string iteration | `15-strings`, `16-utf8` | A string as `{data, len}`, and bytes against characters. |
 | Multiple results | `20-errors` | The failure as a second slot, not as prose. |
+| Unions, type switch | `27-unions` | One member, named by the type it holds. The struct-with-a-flag version prints the same and can be in states a union cannot. |
 | `or_return` | `21-or-return` | The error leaving on its own, instead of a zero that looks like an answer. |
 | `string` type conversions | `22-string-copy` | Assigning a string hands over a second view of the same bytes; `strings.clone` makes a second set. Both print the same lengths. |
 | Structs: assignment | `23-struct-copy` | Two objects, or one object with two names. The tool could not draw this correctly until [R-25](RISKS.md#r-25) was fixed, which is why the exercise arrived after the defect. |
@@ -77,16 +78,14 @@ Twenty-five exercises, against the overview's own section names.
 ## 3. What will not become an exercise, and why
 
 Each line below was **tried and probed**, not assumed. This section exists so
-that "there are only twenty-five" reads as a decision with reasons rather than
+that "there are only twenty-seven" reads as a decision with reasons rather than
 as a gap.
 
 | Overview section | Why not |
 |---|---|
-| Unions, type switch | The model has no rule for a union, so the whole screen reads `unknown` ([R-24](RISKS.md#r-24)). Honest, and it teaches nothing about unions. Tractable — this is the first hole worth closing. |
 | Maps | Entries are unreadable through the debugger on this toolchain, so only the count is visible ([R-20](RISKS.md#r-20), [ADR-014](decisions/ADR-014-maps-are-counted-not-walked.md)). |
-| Nested structs | The false picture is fixed ([R-23](RISKS.md#r-23)), and a limit remains: a struct inside a struct is one level past the adapter's expansion depth, so its fields read `…` and cannot be asserted on. The exercise waits on a budget change, not on a lie. |
 | `defer` | A leak is invisible here by construction: absence from the reachable set is not evidence of anything ([ADR-011](decisions/ADR-011-absence-is-not-evidence.md)), and `defer`'s ordering is an output fact. The picture adds nothing the text does not say. |
-| `#soa` | Shared the nested-struct defect ([R-23](RISKS.md#r-23)) and has not been re-probed since the fix. |
+| `#soa` | Shared the nested-struct defect ([R-23](RISKS.md#r-23)), which is fixed. Not re-probed since — a candidate now rather than a blocked one. |
 | Fixed-array CONTENTS — array arithmetic, swizzles | The element accessor ([SPEC-VAL-026](VALIDATION-SPEC.md#spec-val-026)) unblocked slices and dynamic arrays, and `25-in-place` and `26-sorting` came straight out of it. A fixed array of scalars is still recorded as one compact text with no elements ([R-26](RISKS.md#r-26)), so exercises about contents are written against slices for now. |
 | `distinct` types | Probed: a distinct scalar renders exactly like its base type, so the picture cannot show the difference the type system makes. |
 | Implicit context | Filtered out of the picture on purpose. |

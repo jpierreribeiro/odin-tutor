@@ -33,6 +33,12 @@ BUDGETS = {
     "sane_length": int(os.environ.get("TUTOR_SANE_LENGTH", 1_000_000)),
     "steps": int(os.environ.get("TUTOR_STEPS", 2500)),
 }
+# How deep a BY-VALUE composite is expanded. Deliberately not one of BUDGETS:
+# those are declared to the core and compared against what it expects
+# (ADR-006), and this one needs no declaration because reaching it is already
+# visible in the picture as `…`. See read_struct.
+MAX_VALUE_DEPTH = int(os.environ.get("TUTOR_VALUE_DEPTH", 3))
+
 WALL_MS = int(os.environ.get("TUTOR_WALL_MS", 60_000))
 SOURCE = os.environ.get("TUTOR_SOURCE", "")
 OUT_PATH = os.environ.get("TUTOR_OUT", "observations.json")
@@ -189,6 +195,65 @@ def read_view(value, type_name, has_capacity):
     return out
 
 
+def read_union(value, t, type_name, depth):
+    """An Odin tagged union: a `tag`, beside one field per variant.
+
+    Measured 2026-08-06 — gdb sees it as a real union:
+
+        type = union main::Value { u64 tag; int v1; f64 v2; }
+        $1 = {tag = 1, v1 = 42, v2 = 2.07e-322}
+
+    The tag is 1-based over the variants in declaration order, and 0 is nil. The
+    variant fields are named `v1`, `v2`, and reading the one the tag names is
+    the whole rule. Before it, a union reported `unknown` and every screen about
+    one taught the tool's gaps instead of Odin's unions (R-24).
+
+    Note what is NOT done: reading v2 as well. Every variant field is live in
+    the bytes and all but one are nonsense - `2.07e-322` above is the int 42
+    seen as a float. Showing them would be showing the student garbage that
+    looks like data, which is the one thing this tool must never do.
+    """
+    try:
+        names = [f.name for f in t.fields()]
+    except Exception as exc:
+        return unknown(type_name, str(exc))
+
+    if "tag" not in names:
+        # A `#raw_union` carries no tag. Which variant is live is genuinely not
+        # knowable by reading, so say that rather than choosing one.
+        return unknown(type_name, "a raw union has no tag, so no variant can be shown")
+
+    try:
+        tag = int(value["tag"])
+    except Exception as exc:
+        return unknown(type_name, "the union tag is not readable: %s" % exc)
+
+    if tag == 0:
+        return {"state": VALID, "kind": K_SCALAR, "type_name": type_name, "text": "nil"}
+
+    field_name = "v%d" % tag
+    if field_name not in names:
+        return unknown(type_name, "tag %d names no variant of this union" % tag)
+
+    try:
+        variant = value[field_name]
+        observed = read_value(variant, depth + 1)
+        variant_type = str(variant.type.strip_typedefs())
+    except gdb.MemoryError as exc:
+        return unreadable(type_name, str(exc))
+    except Exception as exc:
+        return unknown(type_name, str(exc))
+
+    # The member is NAMED BY ITS TYPE, so the picture reads `int = 42`: which
+    # variant is live and what it holds, in one line. An exercise asks the same
+    # way, with `value_of("v.int")`.
+    return {
+        "state": VALID, "kind": K_STRUCT, "type_name": type_name,
+        "members": [{"name": variant_type, "value": observed}],
+        "address": holder_address(value),
+    }
+
+
 def read_value(value, depth=0):
     """Interpret one gdb.Value.
 
@@ -253,6 +318,9 @@ def read_value(value, depth=0):
     except Exception as exc:
         return unknown(type_name, str(exc))
 
+    if t.code == gdb.TYPE_CODE_UNION:
+        return read_union(value, t, type_name, depth)
+
     if t.code == gdb.TYPE_CODE_STRUCT:
         return read_struct(value, t, type_name, depth)
     if t.code == gdb.TYPE_CODE_ARRAY:
@@ -262,11 +330,20 @@ def read_value(value, depth=0):
 
 
 def read_struct(value, t, type_name, depth):
-    """Read a struct's fields, bounded, one level deep.
+    """Read a struct's fields, bounded by MAX_VALUE_DEPTH.
 
-    Depth is bounded rather than recursive-until-done because a cyclic
-    structure would otherwise expand forever. A nested composite is reported by
-    its shape, and the core links it by identity. See REQ-MEM-011.
+    Depth is bounded rather than recursive-until-done, but the reason is NOT
+    cycles: a cycle needs a pointer, and pointers have their own gate in
+    `expandable`. A composite embedded BY VALUE cannot be cyclic, because its
+    size would be infinite and the compiler would have refused it.
+
+    The bound is against work, not against forever. It was 1, which meant a
+    struct inside a struct - `Casa{canto: Ponto}`, the shape of most real code -
+    reported its fields as `…` and nothing could be asserted about them. Three
+    levels covers the teaching programs this tool is for.
+
+    A cut is visible: the field arrives opaque and the picture shows `…`, which
+    is the tool saying it did not look rather than that there is nothing there.
     """
     members = []
     try:
@@ -278,7 +355,7 @@ def read_struct(value, t, type_name, depth):
         if field.name is None:
             continue
         try:
-            if depth >= 1:
+            if depth >= MAX_VALUE_DEPTH:
                 observed = {"state": VALID, "kind": K_OPAQUE,
                             "type_name": str(field.type), "text": "…"}
             else:

@@ -1,0 +1,16 @@
+{
+  "id": "27-unions",
+  "title": "One of these, and it knows which",
+  "objective": "Show that a union holds one variant at a time and carries which one, instead of holding every field at once and a flag you must trust.",
+  "concepts": ["variable", "struct", "field", "conversion"],
+  "difficulty": 3,
+  "requires": ["04-structs", "17-enums"],
+  "entry": "start.odin",
+  "assertions": [
+    { "id": "A1", "at": "any", "expr": "value_of(\"guardado.int\") == \"42\"" },
+    { "id": "A2", "at": "any", "expr": "field_count(\"guardado\") == 1" },
+    { "id": "A3", "at": "final", "expr": "output_equals(\"42\\n\")" }
+  ],
+  "hints": ["hints.md"],
+  "expected_wall_ms": 3000
+}

@@ -1,0 +1,17 @@
+{
+  "id": "09-nested-structs",
+  "title": "A struct inside a struct",
+  "objective": "Show that a struct field can be a struct, and that the picture reads all the way down to the innermost value.",
+  "concepts": ["struct", "field", "nested-struct"],
+  "difficulty": 2,
+  "requires": ["04-structs"],
+  "entry": "start.odin",
+  "assertions": [
+    { "id": "A1", "at": "any", "expr": "value_of(\"casa.canto.x\") == \"3\"" },
+    { "id": "A2", "at": "any", "expr": "value_of(\"casa.canto.y\") == \"4\"" },
+    { "id": "A3", "at": "any", "expr": "field_count(\"casa\") == 2" },
+    { "id": "A4", "at": "final", "expr": "output_equals(\"3 4\\n\")" }
+  ],
+  "hints": ["hints.md"],
+  "expected_wall_ms": 3000
+}

@@ -792,19 +792,28 @@ Nested fields now read:
       y = …
 ```
 
-**What remains, and it is a limit rather than a lie:** the values are still
-elided. A struct inside a struct is one level past the adapter's expansion
-depth, so `value_of("casa.canto.x")` is `undetermined` — the tool says it did
-not look, instead of claiming two fields are one object. Raising the depth is a
-budget change ([ADR-006](decisions/ADR-006-budgets.md)) and its own piece of
-work.
+**The elision that remained is also gone.** The depth limit was 1, so a struct
+inside a struct — the shape of most real code — reported its fields as `…`. It
+is now a named constant, `MAX_VALUE_DEPTH = 3`.
 
-**`#soa` shares the same cause** and is presumably improved by the same fix; it
-has not been re-probed.
+Raising it is safe for the reason the old comment got wrong: **a cycle needs a
+pointer**, and pointers have their own gate. A composite embedded by value
+cannot be cyclic, because its size would be infinite and the compiler would have
+refused it. The bound is against work, not against forever, and reaching it is
+still visible as `…`.
+
+It is deliberately NOT one of the declared budgets: those are compared against
+what the core expects ([ADR-006](decisions/ADR-006-budgets.md)), and this one
+needs no declaration because reaching it already shows on screen.
+
+`09-nested-structs` ships with this.
+
+**`#soa` shared the same cause** and has not been re-probed since; it is a
+candidate exercise now rather than a blocked one.
 
 <a id="r-24"></a>
-### R-24 — A union has no rule, so it reads `unknown`
-**Class:** MEDIUM · **Status: ANSWERED — it is honest, and it costs a chapter**
+### R-24 — A union had no rule, so it read `unknown`
+**Class:** MEDIUM · **Status: FIXED 2026-08-06**
 
 ```odin
 Value :: union { int, string }
@@ -818,12 +827,27 @@ guess a variant — and it is why unions are not an exercise: a lesson whose who
 screen reads `unknown` teaches nothing about unions and everything about the
 tool.
 
-Unlike [R-20](#r-20), this one looks tractable: a union's tag and payload are
-described in DWARF, so a rule could read the tag, choose the variant, and render
-it. It is scoped work, not a wall.
+It was tractable, and it took one rule. gdb sees an Odin union as a real union:
+a `tag` beside `v1`, `v2`, … in declaration order, 1-based, with 0 for nil. The
+adapter reads the variant the tag names and reports it as a member named by its
+type, so the screen says which one is live and what it holds:
 
-**What must not be claimed:** that the tool covers Odin's type system. It covers
-what it can read, and this is a named hole.
+```
+  [2] union main::Value
+      int = 42
+```
+
+The other variants are deliberately not shown: all but one are the same bytes
+read as the wrong type, and `2.07e-322` for the integer 42 is exactly the
+believable garbage [ADR-008](decisions/ADR-008-unknown-over-false.md) forbids.
+See [SPEC-MEM-054](MEMORY-MODEL.md#spec-mem-054).
+
+A `#raw_union` still reports `unknown`, and that is the right answer: without a
+tag, which variant is live cannot be known by reading.
+
+**What it unblocked.** `27-unions`, whose wrong answer is a struct holding both
+fields and a boolean you have to trust — and which prints exactly what the right
+one prints.
 
 ---
 

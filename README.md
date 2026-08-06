@@ -3,7 +3,7 @@
 [![check](https://github.com/jpierreribeiro/odin-tutor/actions/workflows/check.yml/badge.svg)](https://github.com/jpierreribeiro/odin-tutor/actions/workflows/check.yml)
 [![nightly](https://github.com/jpierreribeiro/odin-tutor/actions/workflows/nightly.yml/badge.svg)](https://github.com/jpierreribeiro/odin-tutor/actions/workflows/nightly.yml)
 
-Twenty-five tiny broken Odin programs. Fix them, and learn how memory actually
+Twenty-seven tiny broken Odin programs. Fix them, and learn how memory actually
 behaves while you do.
 
 **Recommended in parallel with the [official Odin overview](https://odin-lang.org/docs/overview/).**
@@ -138,7 +138,7 @@ never type an exercise name.
 Under every screen:
 
 ```
-Progress: [#####>----------------------------------]  2/25
+Progress: [#####>----------------------------------]  2/27
 Current exercise: exercises/03-fixed-arrays/start.odin
 
 h:hint / t:show me / l:list / c:check all / x:reset / q:quit ?
@@ -177,6 +177,7 @@ Each one accompanies a section of the
 | `06-aliasing` | Two names for one object: a change through one shows through the other |
 | `07-frames` | A call gets its own frame, and returns a value to its caller |
 | `08-recursion` | Each invocation has its own frame, argument and return value |
+| `09-nested-structs` | A struct field can be a struct, and the picture reads all the way down |
 | `10-new-and-free` | `new` creates an object with an identity; `free` ends it |
 | `11-lifetime` | A pointer to freed memory still looks like a pointer |
 | `12-slices` | A slice carries its length beside its data |
@@ -194,6 +195,7 @@ Each one accompanies a section of the
 | `24-parameters` | A parameter is a copy until you pass a pointer |
 | `25-in-place` | A by-reference loop changes the thing, not a copy of it |
 | `26-sorting` | Sorting in place reorders the buffer everyone else can see |
+| `27-unions` | A union holds one variant at a time, and knows which |
 
 **Ten of them print the same thing whether you are right or wrong.** That is
 deliberate: `13-sub-slices`, `17-enums`, `18-varargs`, `19-arenas`, `20-errors`,
