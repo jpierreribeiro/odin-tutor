@@ -36,10 +36,10 @@ nothing. Pointers do, because "two names, one object" is a sentence in a
 reference and a visible fact on the screen.
 
 **The strongest exercises are the ones where the printed output is IDENTICAL for
-the right and the wrong answer.** Ten of the twenty-four are built that way on
-purpose: `13-sub-slices`, `17-enums`, `18-varargs`, `19-arenas`, `20-errors`,
-`21-or-return`, `22-string-copy`, `24-parameters`, `25-in-place` and
-`26-sorting`.
+the right and the wrong answer.** Twenty-two of the thirty-three are, and the
+acceptance script counts them rather than a list here being kept by hand — which
+it was, and which had drifted to a stale ten with two exercises in it that did
+not qualify.
 Every test that compares printed text accepts both programs; only the picture
 separates them. That is the whole argument for this project in one screen.
 

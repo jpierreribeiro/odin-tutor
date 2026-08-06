@@ -205,11 +205,14 @@ Each one accompanies a section of the
 | `32-distinct` | Same bytes, same printed value, a type the compiler will not mix up |
 | `33-maps` | A key you already have is not a second one |
 
-**Ten of them print the same thing whether you are right or wrong.** That is
-deliberate: `13-sub-slices`, `17-enums`, `18-varargs`, `19-arenas`, `20-errors`,
-`21-or-return`, `22-string-copy`, `24-parameters`, `25-in-place` and
-`26-sorting` each have a plausible wrong answer that passes every output check
-ever written. Only the memory tells them apart.
+**Twenty-two of the thirty-three print the same thing whether you are right or
+wrong.** Their wrong answer passes every output assertion the exercise has, so
+no amount of comparing printed text would catch it. Only the memory tells them
+apart.
+
+That count is measured by the acceptance script, not maintained by hand — an
+earlier version of this paragraph said ten, and listed two exercises that did
+not qualify.
 
 More are planned. [`docs/CURRICULUM.md`](docs/CURRICULUM.md) maps every one to
 its overview section — and lists what will **not** become an exercise, with the

@@ -102,6 +102,31 @@ SCRIPT
 )
 	[ "$kind" = "memory" ] || weak="$weak $id"
 done
+# And COUNT the ones whose wrong answer is invisible in the output, because that
+# proportion is the project's whole claim and a number kept by hand rots. This
+# paragraph in the README once said ten, listed two exercises that did not
+# qualify, and was wrong by a factor of two in the direction of understating it.
+identical=0
+for id in $exercises; do
+	report="$work/$id.wrong"
+	[ -f "$report" ] || continue
+	failing=$(grep -E '^  (FAIL|undetermined)' "$report" | awk '{print $2}' | tr '\n' ' ')
+	same=$(python3 - "exercises/$id/exercise.json" "$failing" <<'SCRIPT'
+import json, sys
+declared = json.load(open(sys.argv[1]))["assertions"]
+failed = set(sys.argv[2].split())
+output = {a["id"] for a in declared
+          if "output_" in a["expr"] or "exits_with" in a["expr"]}
+# Every output assertion passed on the wrong answer: it printed what the right
+# answer prints.
+print("identical" if output and not (output & failed) else "-")
+SCRIPT
+)
+	[ "$same" = "identical" ] && identical=$((identical + 1))
+done
+total=$(echo "$exercises" | wc -w)
+printf '        %d of %d print the SAME OUTPUT right or wrong\n' "$identical" "$total"
+
 if [ -z "$weak" ]; then
 	ok "every exercise rejects its wrong answer by an assertion about MEMORY"
 else
