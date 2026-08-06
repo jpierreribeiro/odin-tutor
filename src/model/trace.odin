@@ -31,6 +31,15 @@ Slot :: struct {
 	state:  Value_State `json:"state"`,
 	// text is the shown content, for a scalar or a string.
 	text:   string      `json:"text,omitempty"`,
+	// length is the element count when one was observed, even if the contents
+	// were not. A map is the case this exists for: ADR-014 says it is COUNTED,
+	// not walked, so the count is real while the entries are `unknown`.
+	length: int         `json:"length,omitempty"`,
+	// type_name is the type AS DECLARED, so `distinct` survives to the screen.
+	// An entity carries its own; a scalar has no entity and would otherwise
+	// have nowhere to put it. Optional, so no format version change
+	// (SPEC-TRACE-070).
+	type_name: string   `json:"type_name,omitempty"`,
 	// refers_to is the identity of the entity this slot points at, or 0.
 	// The interface prints it as a label. It is never an address.
 	refers_to: Id       `json:"refers_to,omitempty"`,

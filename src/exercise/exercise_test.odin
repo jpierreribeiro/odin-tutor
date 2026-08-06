@@ -224,3 +224,39 @@ an_unbalanced_bracket_resolves_to_nothing_rather_than_a_guess :: proc(t: ^testin
 	testing.expect_value(t, len(broken), 1)
 	testing.expect_value(t, broken[0], "marks")
 }
+
+// --- ordering comparisons ----------------------------------------------------
+
+@(test)
+an_ordering_operator_is_parsed_and_kept :: proc(t: ^testing.T) {
+	// Equality alone cannot say "never more than", which is the shape of every
+	// lesson about growth. A wrong answer that passes THROUGH the right number
+	// on its way past it satisfies `== n` at some step and must not.
+	call, ok := parse(`length_of("vistos") <= 2`)
+	testing.expect(t, ok, "an ordering comparison parses")
+	testing.expect_value(t, call.name, "length_of")
+	testing.expect_value(t, call.operator, "<=")
+	testing.expect_value(t, call.expected, "2")
+}
+
+@(test)
+a_two_character_operator_is_not_split :: proc(t: ^testing.T) {
+	// `<` would swallow `<=` and leave "= 2" as the expected value, which
+	// parses as no number at all and reports `undetermined` forever.
+	Case :: struct {
+		expr:     string,
+		operator: string,
+	}
+	for c in ([]Case{
+		{`length_of("a") <= 2`, "<="},
+		{`length_of("a") >= 2`, ">="},
+		{`length_of("a") < 2`, "<"},
+		{`length_of("a") > 2`, ">"},
+		{`length_of("a") == 2`, "=="},
+	}) {
+		call, ok := parse(c.expr)
+		testing.expect(t, ok, c.expr)
+		testing.expect_value(t, call.operator, c.operator)
+		testing.expect_value(t, call.expected, "2")
+	}
+}

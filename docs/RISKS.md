@@ -75,7 +75,7 @@ Phase 0 exists for no other reason.
 
 | ID | The question | Class | Where it bites |
 |---|---|---|---|
-| **R-20** | Can map entries be read at all through the debugger? | **HIGH** | [MEMORY-MODEL.md](MEMORY-MODEL.md) §8 assumed yes. The type exposes only `['data', 'len', 'allocator']` — no key or value access. |
+| **R-20** | Can map entries be read at all through the debugger? | **HIGH** | [MEMORY-MODEL.md](MEMORY-MODEL.md) §8 assumed yes. The type exposes only `['data', 'len', 'allocator']` — no key or value access. **Narrowed 2026-08-06:** the entries stay unreadable, and the COUNT is a measured fact that now reaches the screen and the validator. `33-maps` teaches from it. |
 | **R-21** | Can use-after-free be detected by reading? | **Answered: no.** | A freed region stays mapped and returns plausible garbage with no error. Phase 6 is the only mechanism. |
 
 ### Added after the consistency review
@@ -945,6 +945,64 @@ rendered screen. A false picture that shipped earns an end-to-end check.
 
 **What it unblocked.** `28-soa`, and element assertions on fixed arrays
 everywhere.
+
+---
+
+<a id="r-27"></a>
+### R-27 — The expansion walked into a map the reader refused to walk
+**Class:** BLOCKING for the picture's promise · **Status: FIXED 2026-08-06**
+
+[ADR-014](decisions/ADR-014-maps-are-counted-not-walked.md) says a map is
+**counted, not walked**: its layout is private, decoding it shows wrong pairs
+when it is wrong, and it fails silently on a toolchain update. The reader obeyed
+that. The pointer expansion did not — it walked the map header's fields, found
+`data`, followed it, and put the map's internal cell struct on screen as an
+object:
+
+```
+  [2] struct struct{key:string,value:bool,hash:uintptr,key_cell:string,value_cell:bool}
+      key -> [3]
+      value = false
+```
+
+A student would read that as an object their program made. They wrote no such
+type; it is the map's private interior, in a shape this project promises not to
+decode.
+
+**The cause was two places deciding the same thing.** The reader recognised a
+map by its field set; the expansion had no idea what a map was. One
+`is_map_shape` now decides, and the expansion returns without walking.
+
+**Found while writing `33-maps`**, which is the pattern of this session: an
+exercise makes the tool explain itself.
+
+<a id="r-28"></a>
+### R-28 — `distinct` was thrown away by the adapter, not absent from the target
+**Class:** MEDIUM · **Status: FIXED 2026-08-06**
+
+This document previously recorded that a `distinct` scalar "renders exactly like
+its base type, so the picture cannot show the difference the type system makes".
+That was wrong, and it was wrong in the direction that costs most: it named a
+limit where there was a discarded fact.
+
+**Measured 2026-08-06.** gdb knows perfectly well:
+
+```
+id     declared=main::User_Id   stripped=int
+plain  declared=int             stripped=int
+```
+
+`read_value` computed `type_name` from `strip_typedefs()`, which is exactly the
+call that erases a typedef — and `distinct` is a typedef in debug information.
+
+**The fix.** Dispatch on the stripped type, report the declared one. Stripping is
+still right for dispatch: shape recognition asks what something IS, and a
+`distinct [3]f32` is still an array. Measured across every shape, declared and
+stripped differ ONLY for `distinct`, so nothing else moved.
+
+The slot carries the type now, the screen shows a NAMED type and hides a builtin
+(`id: main::User_Id = 7` beside `plain = 7`), and `type_of` answers on a scalar.
+`32-distinct` ships with it.
 
 ---
 

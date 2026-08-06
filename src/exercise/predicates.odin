@@ -18,6 +18,8 @@ Subject :: struct {
 	has_entity: bool,
 	// text and state come from the slot itself.
 	text:      string,
+	type_name: string,
+	length:    int,
 	state:     tutor_model.Value_State,
 	refers_to: tutor_model.Id,
 	is_reference: bool,
@@ -66,6 +68,8 @@ resolve :: proc(
 			subject = Subject {
 				found        = true,
 				text         = slot.text,
+				type_name    = slot.type_name,
+				length       = slot.length,
 				state        = slot.state,
 				refers_to    = slot.refers_to,
 				is_reference = slot.is_reference,
@@ -458,10 +462,18 @@ apply :: proc(
 		}
 		return verdict_of(visited == wanted), fmt.tprintf("%d distinct objects before nil", visited)
 	case "length_of":
-		if !a.has_entity {
-			return .Undetermined, "this is not a view"
+		// A view carries its length on its entity. A MAP has no entity — its
+		// entries are unknown — and its count is still a measured fact
+		// (ADR-014). Asking how many are in it is answerable; asking what they
+		// are is not.
+		if a.has_entity {
+			return compare_number(call, a.entity.length, "length")
 		}
-		return compare_number(call, a.entity.length, "length")
+		if a.found && a.length > 0 {
+			return compare_number(call, a.length, "length")
+		}
+		return .Undetermined, "this is not a view"
+
 	case "element_count", "field_count":
 		if !a.has_entity {
 			return .Undetermined, "this is not an object"
@@ -472,14 +484,25 @@ apply :: proc(
 		}
 		return compare_number(call, len(a.entity.members), "count")
 	case "type_of":
-		if !a.has_entity {
-			return .Undetermined, "this is not an object"
+		// An object carries its own type; a SCALAR has no entity, and its type
+		// lives on the slot. Without the second case a `distinct` type could
+		// not be asserted on at all — which is what made `distinct` look like
+		// something the picture could not show, when in fact nothing was
+		// asking.
+		name := a.has_entity ? a.entity.type_name : a.type_name
+		if name == "" {
+			return .Undetermined, "this has no recorded type"
 		}
-		return verdict_of(call.compares && a.entity.type_name == call.expected), a.entity.type_name
+		return verdict_of(call.compares && name == call.expected), name
 	case "value_of":
 		if a.state != .Valid {
 			// The state IS the answer, and it is not the student's doing.
 			return .Undetermined, fmt.tprintf("the value is %v", a.state)
+		}
+		if call.compares && call.operator != "==" {
+			// Ordering a string is not a question this vocabulary answers, and
+			// silently comparing bytes would answer a different one.
+			return .Undetermined, "value_of compares with == only"
 		}
 		return verdict_of(call.compares && a.text == call.expected), a.text
 	case "state_of":
@@ -497,6 +520,16 @@ compare_number :: proc(call: Call, actual: int, what: string) -> (Verdict, strin
 	wanted, ok := strconv.parse_int(call.expected)
 	if !ok {
 		return .Undetermined, "the expected value is not a number"
+	}
+	switch call.operator {
+	case "<=":
+		return verdict_of(actual <= wanted), fmt.tprintf("%s is %d", what, actual)
+	case ">=":
+		return verdict_of(actual >= wanted), fmt.tprintf("%s is %d", what, actual)
+	case "<":
+		return verdict_of(actual < wanted), fmt.tprintf("%s is %d", what, actual)
+	case ">":
+		return verdict_of(actual > wanted), fmt.tprintf("%s is %d", what, actual)
 	}
 	return verdict_of(actual == wanted), fmt.tprintf("%s is %d", what, actual)
 }

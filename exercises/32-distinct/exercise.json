@@ -1,0 +1,17 @@
+{
+  "id": "32-distinct",
+  "title": "Two numbers the compiler will not mix up",
+  "objective": "Show that a distinct type is a new type with the same bytes, so the picture names it even where the value looks identical.",
+  "concepts": ["variable", "constant", "conversion", "scalar"],
+  "difficulty": 2,
+  "requires": ["01-values", "17-enums"],
+  "entry": "start.odin",
+  "assertions": [
+    { "id": "A1", "at": "any", "expr": "type_of(\"id\") == \"main::User_Id\"" },
+    { "id": "A2", "at": "any", "expr": "type_of(\"idade\") == \"int\"" },
+    { "id": "A3", "at": "any", "expr": "value_of(\"id\") == \"7\"" },
+    { "id": "A4", "at": "final", "expr": "output_equals(\"7 7\\n\")" }
+  ],
+  "hints": ["hints.md"],
+  "expected_wall_ms": 3000
+}

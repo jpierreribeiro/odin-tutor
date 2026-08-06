@@ -254,6 +254,20 @@ def read_union(value, t, type_name, depth):
     }
 
 
+def is_map_shape(t):
+    """Is this the Odin map header, `{data, len, allocator}`?
+
+    One place decides, because two places disagreeing is how the reader came to
+    say "counted, not walked" while the expansion walked it anyway.
+    """
+    try:
+        if t.code != gdb.TYPE_CODE_STRUCT:
+            return False
+        return {f.name for f in t.fields()} == {"data", "len", "allocator"}
+    except Exception:  # noqa: BLE001
+        return False
+
+
 def read_value(value, depth=0):
     """Interpret one gdb.Value.
 
@@ -261,8 +275,22 @@ def read_value(value, depth=0):
     interpreted truthfully. There is no best-guess branch. See SAFETY.md §2.
     """
     try:
+        # DISPATCH on the stripped type, REPORT the declared one.
+        #
+        # `distinct` is a typedef in debug information, so stripping it answers
+        # `int` for a `User_Id` and the picture showed a distinct type as
+        # identical to the type it was made from. The name was there the whole
+        # time and this function threw it away.
+        #
+        # Stripping is still right for dispatch: shape recognition asks what
+        # something IS — a slice, a string, a struct — and a `distinct [3]f32`
+        # is still an array. So it keeps its own name and is still read as the
+        # array it is.
+        #
+        # Measured 2026-08-06: declared and stripped differ ONLY for `distinct`.
+        # Every other shape reports the same string either way.
         t = value.type.strip_typedefs()
-        type_name = str(t)
+        type_name = str(value.type)
     except Exception as exc:
         return unknown("?", str(exc))
 
@@ -282,7 +310,7 @@ def read_value(value, depth=0):
         return read_view(value, type_name, has_capacity=False)
     if fields >= {"data", "len", "cap"}:
         return read_view(value, type_name, has_capacity=True)
-    if fields == {"data", "len", "allocator"}:
+    if is_map_shape(t):
         # A map. The type exposes no key or value access: Odin packs the
         # capacity into the low bits of the data pointer and stores keys and
         # values in parallel arrays. Decoding that is a guess about a layout no
@@ -546,6 +574,12 @@ class Expansion:
         try:
             t = target.type.strip_typedefs()
             if t.code != gdb.TYPE_CODE_STRUCT:
+                return
+            # ADR-014 says a map is COUNTED, NOT WALKED — and this walked it.
+            # Following its `data` pointer put the map's private cell struct on
+            # screen as an object, with a layout no student wrote and this
+            # project promises not to decode.
+            if is_map_shape(t):
                 return
             fields = t.fields()
         except Exception:  # noqa: BLE001

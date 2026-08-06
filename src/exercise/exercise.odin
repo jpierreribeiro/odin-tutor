@@ -118,17 +118,31 @@ Call :: struct {
 	name:      string,
 	arguments: []string,
 	compares:  bool,
+	// operator is how `expected` is compared: "==", "<=", ">=", "<" or ">".
+	//
+	// Equality alone could not say "never more than", which is the natural
+	// shape of a lesson about growth: a count that must not exceed a bound, a
+	// capacity that must not be reached. Writing it as equality at one step
+	// asks a weaker question, and a wrong answer that passes THROUGH the right
+	// number on its way past it slips by.
+	operator:  string,
 	expected:  string,
 }
 
 parse :: proc(expr: string, allocator := context.temp_allocator) -> (call: Call, ok: bool) {
 	text := strings.trim_space(expr)
 
-	comparison := strings.index(text, "==")
-	if comparison >= 0 {
+	// Two-character operators first: `<` would otherwise swallow `<=`.
+	for op in ([]string{"==", "<=", ">=", "<", ">"}) {
+		comparison := strings.index(text, op)
+		if comparison < 0 {
+			continue
+		}
 		call.compares = true
-		call.expected = unquote(strings.trim_space(text[comparison + 2:]))
+		call.operator = op
+		call.expected = unquote(strings.trim_space(text[comparison + len(op):]))
 		text = strings.trim_space(text[:comparison])
+		break
 	}
 
 	open := strings.index_byte(text, '(')

@@ -118,8 +118,21 @@ them the right and the wrong answer print the same thing and differ only in what
 the collection now holds.
 
 Only collections whose elements the adapter records have members: slices,
-dynamic arrays and strings do, and a fixed array of scalars is currently
-recorded as one compact text instead ([R-26](RISKS.md#r-26)).
+dynamic arrays, strings and fixed arrays do. A map does **not** — its count is
+readable and its entries are not, so `length_of` answers and `element_count`
+does not ([ADR-014](decisions/ADR-014-maps-are-counted-not-walked.md)).
+
+<a id="spec-val-028"></a>
+### SPEC-VAL-028 — A numeric comparison may be ordered
+`==`, `<=`, `>=`, `<` and `>` compare a count or a length. `value_of` compares
+with `==` only: ordering a string's text is not a question this vocabulary
+answers, and comparing bytes would silently answer a different one.
+
+*Rationale:* equality alone cannot say **never more than**, which is the shape
+of every lesson about growth — a count that must not exceed a bound, a capacity
+that must not be reached. Worse, `== n` evaluated at `any` step is satisfied by
+a wrong answer that merely PASSES THROUGH `n` on its way past it. `all` with
+`<= n` says what was meant.
 
 <a id="spec-val-027"></a>
 ### SPEC-VAL-027 — `frees(n)` asks what the program gave back

@@ -47,7 +47,7 @@ separates them. That is the whole argument for this project in one screen.
 
 ## 2. Mapping
 
-Thirty-one exercises, against the overview's own section names.
+Thirty-three exercises, against the overview's own section names.
 
 | Overview section | Exercise | What the picture adds |
 |---|---|---|
@@ -69,6 +69,8 @@ Thirty-one exercises, against the overview's own section names.
 | `string` type, string iteration | `15-strings`, `16-utf8` | A string as `{data, len}`, and bytes against characters. |
 | Multiple results | `20-errors` | The failure as a second slot, not as prose. |
 | SOA data types | `28-soa` | The only edit is `#soa`, and the code reads the same. One array per field instead of one struct per element — an arrangement nothing in the source shows. |
+| Distinct types | `32-distinct` | `id: main::User_Id = 7` beside `plain = 7`. Same bytes, same printed value; the screen names the type and nothing else would. |
+| Maps | `33-maps` | The count is measured and the entries are not. Writing a key twice does not add a second one — a lesson the count alone can teach. |
 | Unions, type switch | `27-unions` | One member, named by the type it holds. The struct-with-a-flag version prints the same and can be in states a union cannot. |
 | `or_return` | `21-or-return` | The error leaving on its own, instead of a zero that looks like an answer. |
 | `string` type conversions | `22-string-copy` | Assigning a string hands over a second view of the same bytes; `strings.clone` makes a second set. Both print the same lengths. |
@@ -82,13 +84,11 @@ Thirty-one exercises, against the overview's own section names.
 ## 3. What will not become an exercise, and why
 
 Each line below was **tried and probed**, not assumed. This section exists so
-that "there are only thirty-one" reads as a decision with reasons rather than
+that "there are only thirty-three" reads as a decision with reasons rather than
 as a gap.
 
 | Overview section | Why not |
 |---|---|
-| Maps | Entries are unreadable through the debugger on this toolchain, so only the count is visible ([R-20](RISKS.md#r-20), [ADR-014](decisions/ADR-014-maps-are-counted-not-walked.md)). |
-| `distinct` types | Probed: a distinct scalar renders exactly like its base type, so the picture cannot show the difference the type system makes. |
 | Implicit context | Filtered out of the picture on purpose. |
 | Comments, packages, attributes, build tags, foreign, calling conventions, `when` | Prose, tooling, or compile-time. Nothing to see in memory. |
 | Parametric polymorphism, bit sets, `bit_field`, matrices | Marginal. The picture shows the concrete instance, which the text already told you. Candidates if the course ever needs more. |

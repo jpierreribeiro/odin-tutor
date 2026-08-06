@@ -3,7 +3,7 @@
 [![check](https://github.com/jpierreribeiro/odin-tutor/actions/workflows/check.yml/badge.svg)](https://github.com/jpierreribeiro/odin-tutor/actions/workflows/check.yml)
 [![nightly](https://github.com/jpierreribeiro/odin-tutor/actions/workflows/nightly.yml/badge.svg)](https://github.com/jpierreribeiro/odin-tutor/actions/workflows/nightly.yml)
 
-Thirty-one tiny broken Odin programs. Fix them, and learn how memory actually
+Thirty-three tiny broken Odin programs. Fix them, and learn how memory actually
 behaves while you do.
 
 **Recommended in parallel with the [official Odin overview](https://odin-lang.org/docs/overview/).**
@@ -138,7 +138,7 @@ never type an exercise name.
 Under every screen:
 
 ```
-Progress: [#####>----------------------------------]  2/31
+Progress: [#####>----------------------------------]  2/33
 Current exercise: exercises/03-fixed-arrays/start.odin
 
 h:hint / t:show me / l:list / c:check all / x:reset / q:quit ?
@@ -200,6 +200,8 @@ Each one accompanies a section of the
 | `29-array-math` | `a + b` adds every element at once, with no index to get wrong |
 | `30-swizzle` | `.zyx` builds a new array in the order you named |
 | `31-defer` | `defer` gives the memory back from where you took it |
+| `32-distinct` | Same bytes, same printed value, a type the compiler will not mix up |
+| `33-maps` | A key you already have is not a second one |
 
 **Ten of them print the same thing whether you are right or wrong.** That is
 deliberate: `13-sub-slices`, `17-enums`, `18-varargs`, `19-arenas`, `20-errors`,

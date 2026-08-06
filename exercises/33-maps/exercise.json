@@ -1,0 +1,36 @@
+{
+  "id": "33-maps",
+  "title": "A key you already have is not a second one",
+  "objective": "Show that a map counts distinct keys, so writing the same key twice replaces rather than adds.",
+  "concepts": [
+    "data-structure",
+    "dynamic-array",
+    "mutation"
+  ],
+  "difficulty": 2,
+  "requires": [
+    "14-dynamic-arrays"
+  ],
+  "entry": "start.odin",
+  "assertions": [
+    {
+      "id": "A1",
+      "at": "all",
+      "expr": "length_of(\"vistos\") <= 2"
+    },
+    {
+      "id": "A2",
+      "at": "any",
+      "expr": "length_of(\"vistos\") == 2"
+    },
+    {
+      "id": "A3",
+      "at": "final",
+      "expr": "output_equals(\"2\\n\")"
+    }
+  ],
+  "hints": [
+    "hints.md"
+  ],
+  "expected_wall_ms": 3000
+}

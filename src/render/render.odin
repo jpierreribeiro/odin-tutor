@@ -198,7 +198,14 @@ write_source :: proc(b: ^strings.Builder, s: Screen, current: int) {
 write_slot :: proc(b: ^strings.Builder, slot: tutor_model.Slot, indent: int, style: Style) {
 	pad := strings.repeat(" ", indent, context.temp_allocator)
 	if slot.state != .Valid {
-		fmt.sbprintf(b, "%s%s %s", pad, slot.name, state_mark(slot.state, style))
+		fmt.sbprintf(b, "%s%s", pad, slot.name)
+		// A COUNT can be known while the contents are not, and a map is the
+		// case: ADR-014 counts it rather than walking it. Printing only
+		// `unknown` would hide a measured fact behind an honest one.
+		if slot.length > 0 {
+			fmt.sbprintf(b, " (%d %s)", slot.length, slot.length == 1 ? "entry" : "entries")
+		}
+		fmt.sbprintf(b, " %s", state_mark(slot.state, style))
 		if slot.reason != "" {
 			fmt.sbprintf(b, " (%s)", slot.reason)
 		}
@@ -208,6 +215,20 @@ write_slot :: proc(b: ^strings.Builder, slot: tutor_model.Slot, indent: int, sty
 	if slot.refers_to != tutor_model.NO_ID {
 		arrow := style.unicode ? "→" : "->"
 		fmt.sbprintf(b, "%s%s %s %s\n", pad, slot.name, arrow, label(slot.refers_to, style))
+		return
+	}
+	// A NAMED type is shown; a builtin is not.
+	//
+	// `id: main::User_Id = 7` beside `plain = 7` is the whole lesson of a
+	// distinct type: same bytes, same printed value, different type — and
+	// nothing else on this screen would tell them apart. Showing `: int` on
+	// every scalar would be noise on every line to say what the value already
+	// says.
+	//
+	// A named Odin type carries `::`, which is the same convention the entity
+	// lines already use (`struct main::Node`).
+	if strings.contains(slot.type_name, "::") {
+		fmt.sbprintf(b, "%s%s: %s = %s\n", pad, slot.name, slot.type_name, slot.text)
 		return
 	}
 	fmt.sbprintf(b, "%s%s = %s\n", pad, slot.name, slot.text)

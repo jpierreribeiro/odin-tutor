@@ -407,11 +407,17 @@ slot_from_value :: proc(
 	truncations: ^[dynamic]Truncation,
 ) -> Slot {
 	slot := Slot {
-		name   = variable.name,
-		state  = state_from_obs(variable.value.state),
-		reason = variable.value.reason,
+		name      = variable.name,
+		state     = state_from_obs(variable.value.state),
+		reason    = variable.value.reason,
+		type_name = variable.value.type_name,
+		length    = variable.value.length,
 	}
 	if slot.state != .Valid {
+		// Not valid does not mean nothing is known. A map's entries are
+		// unreadable and its COUNT is measured, and dropping the count here is
+		// what made "how many are in it" unanswerable for a fact the adapter
+		// had already reported.
 		return slot
 	}
 
