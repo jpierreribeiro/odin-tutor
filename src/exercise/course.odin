@@ -30,13 +30,19 @@ Entry :: struct {
 // directory name changes when someone renames a file (SPEC-EX-011).
 Progress :: struct {
 	completed: []string `json:"completed"`,
+	// welcomed records that the first-run explanation has been shown. It is
+	// state, not preference: a student who has read it once should not have to
+	// press a key past it every morning.
+	welcomed:  bool     `json:"welcomed"`,
 }
 
-// progress_path is outside the exercise tree.
+// xdg_progress_path is where progress goes when there is no student directory.
 //
 // A student's progress is not part of the course content, and writing it beside
-// the exercises would put their state into whatever they cloned.
-progress_path :: proc(allocator := context.allocator) -> string {
+// the exercises would put their state into whatever they cloned. Once `init`
+// exists the answer is better still — the progress lives in the student's own
+// directory, so two courses do not share one count. See Course.state.
+xdg_progress_path :: proc(allocator := context.allocator) -> string {
 	if state := os.get_env("XDG_STATE_HOME", context.temp_allocator); state != "" {
 		return strings.concatenate({state, "/odin-tutor/progress.json"}, allocator)
 	}
@@ -44,8 +50,8 @@ progress_path :: proc(allocator := context.allocator) -> string {
 	return strings.concatenate({home, "/.local/state/odin-tutor/progress.json"}, allocator)
 }
 
-progress_load :: proc(allocator := context.allocator) -> Progress {
-	data, err := os.read_entire_file(progress_path(context.temp_allocator), context.temp_allocator)
+progress_load :: proc(course: Course, allocator := context.allocator) -> Progress {
+	data, err := os.read_entire_file(course.state, context.temp_allocator)
 	if err != nil {
 		return {}
 	}
@@ -73,8 +79,8 @@ progress_mark :: proc(progress: ^Progress, id: string, allocator := context.allo
 	progress.completed = updated[:]
 }
 
-progress_save :: proc(progress: Progress) -> bool {
-	path := progress_path(context.temp_allocator)
+progress_save :: proc(course: Course, progress: Progress) -> bool {
+	path := course.state
 	directory := filepath.dir(path)
 	if os.make_directory_all(directory) != nil && !os.exists(directory) {
 		return false
@@ -95,11 +101,22 @@ is_done :: proc(progress: Progress, id: string) -> bool {
 	return false
 }
 
-// discover reads every exercise under a directory, in order.
+// discover reads every exercise of a course and marks what is finished.
+discover :: proc(course: Course, allocator := context.allocator) -> []Entry {
+	entries := discover_at(course.exercises, allocator)
+	progress := progress_load(course, allocator)
+	for &entry in entries {
+		entry.done = is_done(progress, entry.exercise.id)
+	}
+	return entries
+}
+
+// discover_at reads every exercise under a directory, in order, and asks
+// nothing about progress.
 //
 // Ordered by `id`, not by the file system. Directory order changes when a file
 // is renamed; an id does not (SPEC-EX-011).
-discover :: proc(root: string, allocator := context.allocator) -> []Entry {
+discover_at :: proc(root: string, allocator := context.allocator) -> []Entry {
 	entries := make([dynamic]Entry, allocator)
 
 	handle, open_err := os.open(root)
@@ -113,7 +130,6 @@ discover :: proc(root: string, allocator := context.allocator) -> []Entry {
 		return entries[:]
 	}
 
-	progress := progress_load(allocator)
 	for info in infos {
 		if info.type != .Directory {
 			continue
@@ -136,11 +152,7 @@ discover :: proc(root: string, allocator := context.allocator) -> []Entry {
 		if dir_err != nil {
 			continue
 		}
-		append(&entries, Entry {
-			directory = directory,
-			exercise = exercise,
-			done = is_done(progress, exercise.id),
-		})
+		append(&entries, Entry{directory = directory, exercise = exercise})
 	}
 
 	slice.sort_by(entries[:], proc(a, b: Entry) -> bool {

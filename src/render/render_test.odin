@@ -128,3 +128,61 @@ the_render_contains_no_address :: proc(t: ^testing.T) {
 	out := step(trace, 0, {{id = 3, kind = .Object, type_name = "Node"}}, PLAIN, context.temp_allocator)
 	testing.expect(t, !strings.contains(out, "0x"), "no hexadecimal address may appear in the picture")
 }
+
+// --- the chrome around the screen -------------------------------------------
+
+@(test)
+the_progress_bar_points_at_the_start_before_anything_is_finished :: proc(t: ^testing.T) {
+	// A student who has finished nothing has still begun. An empty bar and a
+	// bar with a position in it say different things, and the second is true.
+	bar := progress_bar(0, 16, 10, context.temp_allocator)
+	testing.expect_value(t, bar, "[>---------]")
+}
+
+@(test)
+the_progress_bar_fills_in_proportion :: proc(t: ^testing.T) {
+	testing.expect_value(t, progress_bar(5, 10, 10, context.temp_allocator), "[#####>----]")
+	testing.expect_value(t, progress_bar(16, 16, 10, context.temp_allocator), "[#########>]")
+}
+
+@(test)
+the_progress_bar_survives_a_course_with_no_exercises :: proc(t: ^testing.T) {
+	// Dividing by the total is the obvious way to write this, and an empty
+	// course is the obvious way to crash it.
+	testing.expect_value(t, progress_bar(0, 0, 4, context.temp_allocator), "[>---]")
+}
+
+@(test)
+a_key_that_does_nothing_is_not_on_the_bar :: proc(t: ^testing.T) {
+	// `n` moves to the next exercise, and there is nothing to move on from
+	// until this one passes. Offering it would be an instruction the tool
+	// refuses to obey.
+	unsolved := key_bar(false, true, context.temp_allocator)
+	testing.expect(t, !strings.contains(unsolved, "n:next"), "n is hidden until the exercise passes")
+	testing.expect(t, strings.contains(unsolved, "t:show me"), "and the picture is offered while it does not")
+
+	solved := key_bar(true, true, context.temp_allocator)
+	testing.expect(t, strings.contains(solved, "n:next"), "n appears once it passes")
+
+	nothing_ran := key_bar(false, false, context.temp_allocator)
+	testing.expect(
+		t, !strings.contains(nothing_ran, "t:show me"),
+		"a program that did not build has no picture to show",
+	)
+}
+
+@(test)
+the_footer_carries_the_count_and_the_path :: proc(t: ^testing.T) {
+	// Both are on screen at all times, because the student needs to know where
+	// they are and which file to open, and neither is worth remembering.
+	out := footer(
+		Footer{done = 3, total = 16, path = "exercises/04-structs/start.odin", width = 8},
+		context.temp_allocator,
+	)
+	testing.expect(t, strings.contains(out, "3/16"), "the count is on screen")
+	testing.expect(
+		t, strings.contains(out, "exercises/04-structs/start.odin"),
+		"and so is the file being edited",
+	)
+	testing.expect(t, strings.contains(out, "q:quit"), "and the way out")
+}

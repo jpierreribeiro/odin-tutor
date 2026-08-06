@@ -136,7 +136,23 @@ row here is a requirement nobody will test.
 | [REQ-EX-002](REQUIREMENTS.md#req-ex-002) Assertions evaluated against the trace | [SPEC-VAL-002](VALIDATION-SPEC.md#spec-val-002), [SPEC-VAL-010](VALIDATION-SPEC.md#spec-val-010) | a correct solution written differently from the reference passes | 5 | planned |
 | [REQ-EX-003](REQUIREMENTS.md#req-ex-003) Three verdicts | [SPEC-VAL-001](VALIDATION-SPEC.md#spec-val-001), [SPEC-VAL-003](VALIDATION-SPEC.md#spec-val-003) | per predicate: `pass`, `fail`, `undetermined`, and behaviour on a truncated trace | 5 | planned |
 | [REQ-EX-004](REQUIREMENTS.md#req-ex-004) Failure explains itself | [SPEC-VAL-040](VALIDATION-SPEC.md#spec-val-040) … [SPEC-VAL-042](VALIDATION-SPEC.md#spec-val-042) | a failing solution's message names the step and the expectation | 5 | planned |
-| [REQ-EX-005](REQUIREMENTS.md#req-ex-005) Watch mode | — | a rapid edit sequence yields one verdict, for the last version | 5 | planned |
+| [REQ-EX-005](REQUIREMENTS.md#req-ex-005) Watch mode | [SPEC-EX-022](EXERCISE-SPEC.md#spec-ex-022), [SPEC-EX-023](EXERCISE-SPEC.md#spec-ex-023) | the Phase 5b section of `tests/phase5-acceptance.sh`, driven through a pseudo-terminal | 5 | **met** |
+
+### The shell around the loop answers question 2, not question 1
+
+[SPEC-EX-022](EXERCISE-SPEC.md#spec-ex-022),
+[SPEC-EX-023](EXERCISE-SPEC.md#spec-ex-023),
+[SPEC-EX-032](EXERCISE-SPEC.md#spec-ex-032) and
+[SPEC-EX-033](EXERCISE-SPEC.md#spec-ex-033) are specified and tested, and **no
+requirement asked for any of them.** They exist because `rustlings` was put
+beside this tool and seven differences were visible immediately — the largest
+being that the student had no copy of the course to edit.
+
+That is this table's second question answering itself. The right response is not
+to delete the tests but to notice what the requirements do not cover: everything
+about how a student *obtains and moves through* the course. REQ-EX-001 … 005
+describe an exercise and a validator, and the loop around them was never
+written down as something anyone required.
 
 ---
 

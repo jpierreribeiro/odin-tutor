@@ -104,12 +104,15 @@ watch start.odin
       v
    validate
       │
-      ├── every assertion passes ──> "done", offer the next exercise
+      ├── every assertion passes ──> "done", point at the solution, WAIT for [n]
       │
       └── otherwise ──> show the first failing assertion, offer:
                           [t] open the step player at the relevant step
                           [h] next hint
 ```
+
+Under every screen of the loop: a progress bar, the path being edited, and the
+keys that are live right now.
 
 <a id="spec-ex-020"></a>
 ### SPEC-EX-020 — A failure opens the picture
@@ -118,6 +121,29 @@ the step the assertion was evaluated at.
 
 *Rationale:* this is the feature that distinguishes the project from Rustlings.
 A compile-error tutorial can only say "wrong". This one can show why.
+
+Pressing `t` re-reads the observation stream the run just wrote. It does not
+compile, does not start a debugger, and does not run the student's program a
+second time ([SPEC-PERF-001](PERFORMANCE.md)).
+
+<a id="spec-ex-022"></a>
+### SPEC-EX-022 — The keys are on screen, and only the live ones
+The loop reads single keys: `n` next, `h` hint, `t` show me, `l` list,
+`c` check all, `x` reset, `q` quit. They are listed under every screen, so none
+of them has to be remembered.
+
+A key that would do nothing is **not listed**. `n` appears only once the
+exercise passes; `t` only once there is a recorded run to draw. A bar that
+offers an instruction the tool then refuses is worse than a shorter bar.
+
+<a id="spec-ex-023"></a>
+### SPEC-EX-023 — A pass does not end the exercise
+When every assertion passes, the tool says so, names `solution.odin` for
+comparison, and keeps watching the file. The exercise ends when the student
+presses `n` ([ADR-015](decisions/ADR-015-the-student-ends-the-lesson.md)).
+
+The exception is a run with no terminal to read a key from, which advances on a
+pass and says on screen that it is doing so.
 
 <a id="spec-ex-021"></a>
 ### SPEC-EX-021 — Hints are ordered and are requested
@@ -130,13 +156,43 @@ automatically.
 
 <a id="spec-ex-030"></a>
 ### SPEC-EX-030 — Progress is a local file
-Progress is stored in the user's work directory, keyed by exercise id. It
-records: attempted, passed, and the timestamp of the pass.
+Progress is stored in the student's own course directory, keyed by exercise id,
+never by directory order ([SPEC-EX-011](#spec-ex-011)).
+
+Two copies of the course on one machine do not share a count. When the tool is
+run from a checkout rather than from a course made by `init`, there is no such
+directory, and progress falls back to the state directory.
 
 <a id="spec-ex-031"></a>
 ### SPEC-EX-031 — Progress is advisory
 The student may run any exercise at any time. `requires` produces a note, not a
 lock.
+
+<a id="spec-ex-032"></a>
+### SPEC-EX-032 — The student edits their own copy
+`odin-tutor init` copies the course into a directory the student names, and
+everything the loop does afterwards happens inside it. The course's own tree is
+never written to.
+
+*Rationale:* without it the only way to do the exercises is to edit them where
+they were cloned, which makes the student's answers and the course's history the
+same files. Their `git status` is never clean again, and an update to the course
+conflicts with their work.
+
+What is copied is the manifest, the file they edit, the hints, and
+`solution.odin` — which the loop names on a pass, so it has to be there. The
+wrong solutions are not copied: they are the acceptance script's
+counter-examples ([SPEC-EX-052](#spec-ex-052)), and a directory of deliberately
+broken answers is confusing to read.
+
+<a id="spec-ex-033"></a>
+### SPEC-EX-033 — There is a way back
+`x` in the loop, and `odin-tutor reset`, restore the file the student edits to
+the state it was handed over in. The untouched copy is written by `init` and is
+never written to again.
+
+A course that was not made by `init` has no such copy, and the tool says so by
+name rather than restoring something it has inferred.
 
 ---
 

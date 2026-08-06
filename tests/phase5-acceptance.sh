@@ -267,6 +267,237 @@ rm -rf "$XDG_STATE_HOME"
 
 # ---------------------------------------------------------------------------
 echo
+echo "ROADMAP Phase 5b — the shell around the loop"
+
+# The seven differences between this tool and rustlings, found by putting them
+# side by side rather than by reading the plan. Each one is checked here as it
+# lands, for the same reason the section above exists: the loop itself was
+# missing once while every criterion of Phase 5 passed.
+student="$work/student"
+mkdir -p "$student"
+# The exercises `init` copies FROM. Named rather than searched for, which is
+# also the path an installed build uses.
+export TUTOR_EXERCISES="$root/exercises"
+# The adapter is found beside the executable in an installed build. This script
+# builds the tool into a scratch directory, so it is named here instead — the
+# working directory is deliberately not one of the places it is looked for
+# (SPEC-SAFE-040), and after `init` the working directory is the student's.
+export TUTOR_ADAPTER="$root/adapter/gdb_extractor.py"
+
+pristine="$work/pristine-01-values.odin"
+cp exercises/01-values/start.odin "$pristine"
+
+# 1. init: the student stops editing inside the repository.
+(cd "$student" && "$tool" init mine) > "$work/init.txt" 2>&1 || true
+if [ -f "$student/mine/exercises/01-values/start.odin" ] &&
+	[ -f "$student/mine/.odin-tutor/course.json" ]; then
+	ok "init copies the course into a directory of the student's own"
+else
+	bad "init did not create a student course" "$(cat "$work/init.txt")"
+fi
+
+# THE POINT OF INIT. Before it, the student's answers and the course's history
+# were the same files, so `git status` was never clean again.
+if cmp -s "$pristine" exercises/01-values/start.odin; then
+	ok "and it writes nothing into the course's own tree"
+else
+	bad "init modified the course's own exercises" "The student's tree must be a copy."
+fi
+
+copied=$(ls "$student/mine/exercises" | wc -l)
+declared=$(echo "$exercises" | wc -w)
+if [ "$copied" -eq "$declared" ]; then
+	ok "every exercise is copied ($copied)"
+else
+	bad "init copied $copied of $declared exercises"
+fi
+
+# A directory of deliberately broken answers is confusing to read and pointless
+# to open. The counter-examples belong to this script, not to the student.
+if find "$student/mine/exercises" -name 'wrong-*.odin' | grep -q .; then
+	bad "the wrong solutions were handed to the student"
+else
+	ok "the counter-examples are not part of what a student is given"
+fi
+
+if (cd "$student" && "$tool" init mine) > "$work/init2.txt" 2>&1; then
+	bad "init overwrote a directory that already existed" "That is somebody's answers."
+else
+	if grep -q 'OCCUPIED' "$work/init2.txt"; then
+		ok "init refuses an existing directory by name, rather than overwriting it"
+	else
+		bad "init failed without saying why" "$(head -2 "$work/init2.txt")"
+	fi
+fi
+
+# 2. The tool run from inside that directory works on THAT course.
+(cd "$student/mine/exercises/01-values" && "$tool" list) > "$work/inside.txt" 2>&1 || true
+if grep -qE "0 of $declared finished" "$work/inside.txt"; then
+	ok "the course is found from anywhere inside it, without naming a path"
+else
+	bad "the student's course was not found from a subdirectory" "$(head -3 "$work/inside.txt")"
+fi
+
+# 3. A progress bar, and it is the renderer's, not a second formatter.
+if grep -q 'Progress: \[' "$work/inside.txt" && grep -q '>' "$work/inside.txt"; then
+	ok "a progress bar is drawn, with a position in it"
+else
+	bad "no progress bar" "$(tail -3 "$work/inside.txt")"
+fi
+
+# 4. reset: there is a way back that is not `git checkout`.
+printf 'ruined\n' > "$student/mine/exercises/01-values/start.odin"
+(cd "$student/mine" && "$tool" reset) > "$work/reset.txt" 2>&1 || true
+if cmp -s "$pristine" "$student/mine/exercises/01-values/start.odin"; then
+	ok "reset puts the exercise back exactly as it was handed over"
+else
+	bad "reset did not restore the file" "$(cat "$work/reset.txt")"
+fi
+
+# And it is honest about the one case it cannot serve.
+(cd "$root" && "$tool" reset) > "$work/reset-repo.txt" 2>&1 || true
+if grep -q 'NO_ORIGINAL' "$work/reset-repo.txt"; then
+	ok "a course that was not made by init says so instead of guessing"
+else
+	bad "reset in the repository did not name its limit" "$(head -2 "$work/reset-repo.txt")"
+fi
+if cmp -s "$pristine" exercises/01-values/start.odin; then
+	ok "and it wrote nothing while refusing"
+else
+	bad "a refused reset still modified the repository"
+fi
+
+# 5. Progress belongs to the student's copy, not to one path per machine.
+python3 - "$student/mine" <<'SCRIPT'
+import json, pathlib, sys
+state = pathlib.Path(sys.argv[1]) / ".odin-tutor" / "progress.json"
+state.write_text(json.dumps({"completed": ["01-values"], "welcomed": True}))
+SCRIPT
+if (cd "$student/mine" && "$tool" list) 2>&1 | grep -q 'done  01-values'; then
+	ok "progress is kept in the student's own directory"
+else
+	bad "the course did not read back its own progress"
+fi
+if "$tool" list 2>&1 | grep -qE "0 of $declared finished"; then
+	ok "and a second course does not inherit it"
+else
+	bad "two courses share one count" "Each copy must count its own."
+fi
+
+# 6. The interactive loop, driven through a pseudo-terminal.
+#
+# Every check below needs a real terminal, because that is the whole subject:
+# keys read inside the loop, a bar under every screen, and an exercise that does
+# not end until the student says so.
+if ! command -v script > /dev/null 2>&1; then
+	printf '  SKIP  the interactive loop was NOT checked: `script` is not installed\n'
+	printf '        Install util-linux to run these. They are not optional criteria.\n'
+else
+	cp "$student/mine/exercises/01-values/solution.odin" \
+		"$student/mine/exercises/01-values/start.odin"
+	rm -f "$student/mine/.odin-tutor/progress.json"
+
+	# ENTER past the introduction, then `n` and `q`: solve the first exercise,
+	# move on, leave.
+	(cd "$student/mine" && printf '\nnq' | timeout 300 script -qec "$tool" /dev/null) \
+		> "$work/loop1.txt" 2>&1 || true
+
+	if grep -q 'Welcome to odin-tutor' "$work/loop1.txt"; then
+		ok "a first run explains what an exercise is and how the loop behaves"
+	else
+		bad "no first-run explanation" "$(head -5 "$work/loop1.txt")"
+	fi
+	if grep -q 'Current exercise: exercises/01-values/start.odin' "$work/loop1.txt"; then
+		ok "the path being edited is on screen, relative to the course"
+	else
+		bad "the current exercise path is not shown" "$(grep -c . "$work/loop1.txt") lines"
+	fi
+	if grep -q 'q:quit' "$work/loop1.txt" && grep -q 'x:reset' "$work/loop1.txt"; then
+		ok "the keys are on screen, so none of them has to be remembered"
+	else
+		bad "no key bar" "$(tail -5 "$work/loop1.txt")"
+	fi
+	if grep -q 'Solution for comparison: exercises/01-values/solution.odin' "$work/loop1.txt"; then
+		ok "a passing exercise points at the reference solution"
+	else
+		bad "solution.odin exists and was never mentioned"
+	fi
+
+	# THE DECISION, not a gap (ROADMAP Phase 5b). A solved exercise is the one
+	# moment the student can change a line and watch the picture change with it.
+	# This tool waits for `n` rather than taking that away to save a keypress.
+	if grep -q 'When done experimenting, enter `n` to move on' "$work/loop1.txt" &&
+		grep -q 'n:next' "$work/loop1.txt"; then
+		ok "a solved exercise waits for the student rather than advancing itself"
+	else
+		bad "the loop advanced without being asked" "ROADMAP Phase 5b records the opposite."
+	fi
+	if grep -q '02-control-flow' "$work/loop1.txt"; then
+		ok "and n moves on to the next one"
+	else
+		bad "n did not advance" "$(tail -6 "$work/loop1.txt")"
+	fi
+	if grep -q '02-control-flow' "$work/loop1.txt" &&
+		grep -qE "Progress: \[#+>[-]*\]  1/$declared" "$work/loop1.txt"; then
+		ok "the bar counts what was finished, and only that"
+	else
+		bad "the progress bar did not move after an exercise passed" \
+			"$(grep 'Progress:' "$work/loop1.txt" | tail -2)"
+	fi
+
+	# `t`, `q`, `q`: open the picture where the assertion was decided, come back,
+	# leave. SPEC-EX-020, and the reason this project is not a compile-error
+	# tutorial.
+	(cd "$student/mine" && printf 'tqq' | timeout 300 script -qec "$tool" /dev/null) \
+		> "$work/loop2.txt" 2>&1 || true
+
+	if grep -q 'Welcome to odin-tutor' "$work/loop2.txt"; then
+		bad "the introduction was shown a second time" "It is state, not a preference."
+	else
+		ok "the introduction is shown once and then not again"
+	fi
+	if grep -q 'n:next' "$work/loop2.txt"; then
+		bad "n was offered on an unsolved exercise" "It would be an instruction the tool refuses."
+	else
+		ok "a key that does nothing yet is not on the bar"
+	fi
+	if grep -q 'press `t` to look at it' "$work/loop2.txt"; then
+		ok "a failing assertion names the step it was decided at"
+	else
+		bad "no step was named for a failing assertion" "$(tail -6 "$work/loop2.txt")"
+	fi
+	if grep -q 'g jump' "$work/loop2.txt" && grep -q 'FRAMES' "$work/loop2.txt"; then
+		ok "and t opens the picture there, inside the loop (SPEC-EX-020)"
+	else
+		bad "t did not open the step player" "$(tail -8 "$work/loop2.txt")"
+	fi
+
+	# `c`, on a course of two, because it builds and runs every exercise it can
+	# see and this script already runs all sixteen three times over.
+	(cd "$work" && "$tool" init small) > /dev/null 2>&1 || true
+	(cd "$work/small/exercises" &&
+		ls | grep -vE '01-values|02-control-flow' | xargs rm -rf) 2>/dev/null || true
+	cp "$work/small/exercises/01-values/solution.odin" \
+		"$work/small/exercises/01-values/start.odin"
+	(cd "$work/small" && printf '\ncq' | timeout 300 script -qec "$tool" /dev/null) \
+		> "$work/loop3.txt" 2>&1 || true
+
+	if grep -q 'pass  01-values' "$work/loop3.txt" &&
+		grep -q 'not   02-control-flow' "$work/loop3.txt"; then
+		ok "c checks every exercise, not only the one being watched"
+	else
+		bad "check all did not report every exercise" "$(tail -6 "$work/loop3.txt")"
+	fi
+	if grep -q '"01-values"' "$work/small/.odin-tutor/progress.json" 2>/dev/null; then
+		ok "and what it found passing is recorded, not just printed"
+	else
+		bad "check all printed a pass it did not record" \
+			"Work done outside the watched exercise would not count."
+	fi
+fi
+
+# ---------------------------------------------------------------------------
+echo
 echo "$passed passed, $failed failed"
 [ "$failed" -eq 0 ] || exit 1
 echo

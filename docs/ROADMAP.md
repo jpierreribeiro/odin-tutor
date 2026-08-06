@@ -498,6 +498,41 @@ the validator can be tested through the plain renderer alone.
 
 ## Phase 5b — the shell the loop is missing
 
+> **Built 2026-08-05.** All seven, plus the decision. Twenty-five checks in the
+> Phase 5b section of
+> [`tests/phase5-acceptance.sh`](../tests/phase5-acceptance.sh), which now runs
+> 99.
+>
+> **`odin-tutor init` is the one that changed how the tool is used.** The
+> student's course is their own directory: the exercises, the hints, the
+> reference solutions, and a hidden `.odin-tutor/` holding the marker, their
+> progress, and an untouched copy of every starting file. Nothing is written
+> into the course's own tree, and the acceptance script checks that by comparing
+> the repository's `start.odin` before and after — because "it writes elsewhere"
+> is exactly the kind of claim that rots.
+>
+> The loop reads keys now: `n` `h` `t` `l` `c` `x` `q`, with a progress bar, the
+> path, and a key bar under every screen. The bar lists only the keys that are
+> live, so `n` is absent until the exercise passes.
+>
+> **`t` is not on rustlings' bar, and it is why this project exists.** A failing
+> assertion names the step that decided it, and `t` opens the step player there
+> — from the observation stream the run already wrote, so nothing is compiled or
+> re-run. [SPEC-EX-020](EXERCISE-SPEC.md#spec-ex-020) had described that since
+> before Phase 5, and until now the tool answered it by printing two commands
+> for the student to type in another shell.
+>
+> **Driving the loop needed a pseudo-terminal**, and that is what found the real
+> defect in it: the screen was cleared AFTER the build ran, so a compiler error
+> — the most common thing a student sees — was wiped by the redraw that followed
+> it. Every check up to that point had run non-interactively and could not have
+> seen it. The clear now happens before the build, and the failing-run screen is
+> in the acceptance script.
+>
+> The decision below was made deliberately and recorded as
+> [ADR-015](decisions/ADR-015-the-student-ends-the-lesson.md): a solved exercise
+> **waits**.
+
 Not a new capability. The loop works: it picks the next unfinished exercise,
 watches, re-runs on save, records progress, and advances. What is missing is
 everything AROUND it, and the gap was found by putting `rustlings` side by side
@@ -517,10 +552,16 @@ The seven differences, in the order they are worth closing:
 
 ### One difference that is a DECISION, not a gap
 `rustlings` does not advance by itself: it says "done" and waits for `n`, so the
-student can keep experimenting with a solved exercise. This tool advances
+student can keep experimenting with a solved exercise. This tool advanced
 immediately. That is a choice about who decides when a lesson is finished, and it
 should be made deliberately rather than inherited from whichever was easier to
 write.
+
+**Decided: it waits** ([ADR-015](decisions/ADR-015-the-student-ends-the-lesson.md)).
+A pass is evidence that the assertions are satisfied, not evidence that the
+student has finished looking, and a solved exercise is the one moment where the
+picture is already recorded and one keypress away. The tool advances by itself
+only when there is no terminal to ask, and says so on the line where it does it.
 
 ### What must not be lost while doing this
 The interactive screen formats nothing of its own

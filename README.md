@@ -10,14 +10,17 @@ stack, the variables, and the object graph at each step.
 
 ## Status
 
-**Version 1 is complete: Phases 0 through 5.** One command takes a `.odin` file to a rendered
+**Version 1 is complete: Phases 0 through 5, and the shell around the student's
+loop (5b).** One command takes a `.odin` file to a rendered
 step, and the picture it draws is the memory model: identities that are never
 addresses, sub-slices shown as windows onto one buffer, pointers resolved to
 references, cycles that show their own identifier, and return values attributed
 to the invocation that produced them. `./check.sh` passes — `-vet -strict-style`
-clean, 51 tests across five packages, both JSON schemas validating the real
-adapter output — and every acceptance criterion of Phases 1, 2 and 3 is checked
-by a script anyone can run.
+clean, 68 tests across six packages, both JSON schemas validating the real
+adapter output — and every acceptance criterion of Phases 1 through 6a is
+checked by a script anyone can run, including the interactive loop, which is
+driven through a pseudo-terminal because that is the only way to check a tool
+that reads keys.
 
 `fib(6)` shows **25 return values and not one that contradicts its frame**.
 Frame identity was the least validated part of the design; it now has evidence
@@ -59,17 +62,37 @@ version, drives gdb, records the observation stream beside the trace, and
 assembles it. The recorded stream replays to a byte-identical trace with gdb
 uninstalled, which is what makes every later phase testable in milliseconds.
 
-Sixteen exercises, and one command:
+Sixteen exercises. Make yourself a copy of them, and then run one command:
 
 ```sh
+odin-tutor init            # copies the course into odin-tutor/, which is yours
+cd odin-tutor
 odin-tutor                 # start, or pick up where you left off
-odin-tutor list            # what is done and what is not
-odin-tutor hint            # for the exercise you are on
 ```
 
-One command with no arguments. It chooses the next unfinished exercise, watches
-the file you edit, re-runs on every save, and moves on by itself when you pass.
-You never type an exercise name.
+You edit inside your own directory, never inside this repository — your answers
+and the course's history are not the same files, and your `git status` stays
+clean.
+
+That one command takes no arguments. It chooses the next unfinished exercise,
+watches the file you edit, and re-runs it on every save. You never type an
+exercise name. Under every screen:
+
+```
+Progress: [#####>----------------------------------]  2/16
+Current exercise: exercises/03-fixed-arrays/start.odin
+
+h:hint / t:show me / l:list / c:check all / x:reset / q:quit ?
+```
+
+`t` is the key the rest of this README is about: it opens the picture at the
+step the failing assertion was decided at, from the run that just happened.
+Nothing is compiled and nothing is run again.
+
+A solved exercise does **not** disappear. It says so, points at the reference
+solution, and waits for `n` — because a pass is evidence about the assertions,
+not about whether you have finished looking
+([ADR-015](docs/decisions/ADR-015-the-student-ends-the-lesson.md)).
 
 The exercise that explains the whole project: its wrong solution prints `3 2`,
 exactly like the reference solution, and fails anyway.
@@ -152,6 +175,7 @@ Read in this order.
 | [decisions/](docs/decisions/) | Architecture decision records (`ADR-*`). |
 | [ADR-013](docs/decisions/ADR-013-odin-conventions.md) | **How is the Odin written?** Read before touching `src/`. |
 | [ADR-014](docs/decisions/ADR-014-maps-are-counted-not-walked.md) | Why a map shows a count and no entries. |
+| [ADR-015](docs/decisions/ADR-015-the-student-ends-the-lesson.md) | Why a solved exercise waits for you instead of moving on. |
 
 ## The one rule that outranks the others
 

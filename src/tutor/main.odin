@@ -22,16 +22,24 @@ import tutor_tui "../tui"
 
 USAGE :: `odin-tutor — see what your Odin program does to memory
 
+  odin-tutor init [directory]
+      Copy the exercises into a directory of your own — `+"`odin-tutor/`"+` unless you
+      name another. Do this first. Everything below then works from inside it,
+      and the course's own tree is never written to.
+
   odin-tutor
-      Start. Picks up where you left off, watches the file you are editing,
-      and moves to the next exercise when this one passes. You never type an
-      exercise name.
+      Start. Picks up where you left off, watches the file you are editing, and
+      re-runs it every time you save. You never type an exercise name. Keys:
+      n next, h hint, t show me, l list, c check all, x reset, q quit.
 
   odin-tutor list
       Every exercise, done and not done.
 
   odin-tutor hint
       The next hint for the exercise you are on.
+
+  odin-tutor reset
+      Put the exercise you are on back the way it started.
 
   odin-tutor preflight
       Check the toolchain and report what was found.
@@ -74,14 +82,19 @@ main :: proc() {
 		// No arguments is the STUDENT'S command, not an error. A course that
 		// answers a bare name with a usage message has told the student to go
 		// and read something before they may begin.
-		os.exit(cmd_course(EXERCISES_ROOT))
+		os.exit(cmd_course(tutor_exercise.locate(context.allocator)))
 	}
 
 	switch args[0] {
+	case "init":
+		destination := len(args) > 1 ? args[1] : DEFAULT_COURSE_DIRECTORY
+		os.exit(cmd_init(destination))
 	case "list":
-		os.exit(cmd_list(EXERCISES_ROOT))
+		os.exit(cmd_list(tutor_exercise.locate(context.allocator)))
 	case "hint":
-		os.exit(cmd_hint(EXERCISES_ROOT))
+		os.exit(cmd_hint(tutor_exercise.locate(context.allocator)))
+	case "reset":
+		os.exit(cmd_reset(tutor_exercise.locate(context.allocator)))
 	case "preflight":
 		os.exit(cmd_preflight())
 	case "trace":
@@ -430,160 +443,583 @@ cmd_play :: proc(trace_path: string, style: tutor_render.Style) -> int {
 	return tutor_tui.run(trace, source, style)
 }
 
-EXERCISES_ROOT :: "exercises"
+DEFAULT_COURSE_DIRECTORY :: "odin-tutor"
+
+// course_source finds the exercises `init` copies FROM.
+//
+// The same three named places as adapter_location, and for the same reason: a
+// course found by searching where the student happens to be standing is a course
+// an unrelated directory can replace. The order puts an installed copy first, so
+// a student who also has the repository cloned still gets the installed one.
+course_source :: proc(allocator := context.allocator) -> string {
+	if from_env := os.get_env("TUTOR_EXERCISES", context.temp_allocator); from_env != "" {
+		return strings.clone(from_env, allocator)
+	}
+	if len(os.args) > 0 {
+		beside := filepath.dir(os.args[0])
+		candidate, err := filepath.join({beside, "exercises"}, context.temp_allocator)
+		if err == nil && os.exists(candidate) {
+			return strings.clone(candidate, allocator)
+		}
+	}
+	return strings.clone("exercises", allocator)
+}
+
+// cmd_init copies the course into a directory of the student's own.
+//
+// The first thing anyone runs, and the one command here that changes how the
+// tool is used rather than how it looks: before it, the only way to do the
+// exercises was to edit them inside the repository, where the student's answers
+// and the course's history were the same tree.
+cmd_init :: proc(destination: string) -> int {
+	source := course_source(context.temp_allocator)
+	fmt.printfln("This will create %s/, which will hold your copy of the exercises.", destination)
+
+	err := tutor_exercise.create(destination, source, context.temp_allocator)
+	if err != .None {
+		fmt.eprintln(tutor_exercise.explain_create(err, destination, context.temp_allocator))
+		return 1
+	}
+
+	copied, join_err := filepath.join({destination, "exercises"}, context.temp_allocator)
+	if join_err != nil {
+		copied = destination
+	}
+	found := tutor_exercise.discover_at(copied, context.temp_allocator)
+	fmt.println()
+	fmt.printfln("Done — %d exercises.", len(found))
+	fmt.println()
+	fmt.printfln("  cd %s", destination)
+	fmt.println("  odin-tutor")
+	fmt.println()
+	fmt.println("Open your editor on that directory. Nothing outside it is written to,")
+	fmt.println("and nothing in it is written to by this tool unless you press x to reset.")
+	return 0
+}
+
+// Loop is one run of the course, and everything the screen needs to redraw
+// without running the student's program again.
+Loop :: struct {
+	course:       tutor_exercise.Course,
+	// interactive is false when there is no terminal to read keys from — a pipe,
+	// a test, a CI job. The loop still teaches; it just cannot be answered.
+	interactive:  bool,
+	entry:        tutor_exercise.Entry,
+	entry_path:   string,
+	// shown is entry_path as the student would type it: relative to the course
+	// they are in. The absolute path is what every other procedure here needs
+	// and is the wrong thing to put under a progress bar.
+	shown:        string,
+	done, total:  int,
+	results:      []tutor_exercise.Result,
+	// ran says the program built and traced. Without it there is nothing to
+	// show a picture of, whatever the assertions would have said.
+	ran:          bool,
+	observations: string,
+	solved:       bool,
+	// step is where `t` opens the picture: the step that decided the first
+	// problem, or the first step when there is no problem.
+	step:         int,
+}
 
 // cmd_course is the loop from EXERCISE-SPEC.md §3.
 //
 // Pick the next unfinished exercise, watch the file the student edits, and on
-// every save: build, trace, validate. When every assertion passes, mark it done
-// and move on. The student never names an exercise, and never asks what to do
-// next — that is the whole difference between a validator and a course.
-cmd_course :: proc(root: string) -> int {
-	entries := tutor_exercise.discover(root, context.allocator)
-	if len(entries) == 0 {
-		fmt.eprintfln("NO_EXERCISES: no exercises found under %s/.", root)
-		fmt.eprintln("Run this from the repository root, where the exercises directory is.")
+// every save: build, trace, validate. The student never names an exercise, and
+// never asks what to do next — that is the whole difference between a validator
+// and a course.
+//
+// It does NOT advance by itself. When every assertion passes it says so, points
+// at the reference solution, and waits for `n`. That is a decision, recorded in
+// ROADMAP Phase 5b: a solved exercise is the one moment the student can change
+// a line and watch the picture change with it, and a loop that moves on has
+// taken that away to save them one keypress.
+cmd_course :: proc(course: tutor_exercise.Course) -> int {
+	if len(tutor_exercise.discover_at(course.exercises, context.temp_allocator)) == 0 {
+		fmt.eprintfln("NO_EXERCISES: no exercises found under %s/.", course.exercises)
+		fmt.eprintln("Run `odin-tutor init` to make yourself a copy of the course, then run this")
+		fmt.eprintln("from inside it.")
 		return 1
 	}
 
+	loop := Loop{course = course}
+
+	// The keyboard, not the screen: the compiler's diagnostics belong in the
+	// scrollback where the student can page back through them, so this session
+	// never takes the alternate screen.
+	session: tutor_tui.Session
+	loop.interactive = tutor_tui.enter(&session, .Keys)
+	defer tutor_tui.leave(&session)
+
+	welcome(&loop)
+
 	for {
-		progress := tutor_exercise.progress_load(context.temp_allocator)
-		refreshed := tutor_exercise.discover(root, context.temp_allocator)
-		entry, remaining := tutor_exercise.next_unfinished(refreshed)
+		entries := tutor_exercise.discover(course, context.allocator)
+		entry, remaining := tutor_exercise.next_unfinished(entries)
 		if !remaining {
 			fmt.println()
-			fmt.printfln("All %d exercises are done. Nothing left to teach you here.", len(refreshed))
+			fmt.printfln("All %d exercises are done. Nothing left to teach you here.", len(entries))
 			return 0
 		}
 
-		done := 0
-		for e in refreshed {
+		loop.entry = entry
+		loop.total = len(entries)
+		loop.done = 0
+		for e in entries {
 			if e.done {
-				done += 1
+				loop.done += 1
 			}
 		}
-		fmt.println()
-		fmt.printfln("── %d/%d ── %s", done + 1, len(refreshed), entry.exercise.title)
-		fmt.println(entry.exercise.objective)
-
-		// Advisory, never a refusal. A student who jumps ahead is not wrong.
-		missing := tutor_exercise.missing_requirements(entry, progress, context.temp_allocator)
-		if len(missing) > 0 {
-			fmt.printfln("(this one builds on %s, which you have not finished — carry on if you like)",
-				strings.join(missing, ", ", context.temp_allocator))
-		}
-
-		entry_path, path_err := filepath.join(
-			{entry.directory, entry.exercise.entry}, context.temp_allocator,
+		path, path_err := filepath.join(
+			{entry.directory, entry.exercise.entry}, context.allocator,
 		)
 		if path_err != nil {
 			fmt.eprintln("BAD_PATH: the entry file could not be resolved.")
 			return 1
 		}
-		fmt.printfln("edit %s", entry_path)
-		fmt.println()
+		loop.entry_path = path
+		loop.shown = inside_course(course, path)
 
-		if watch_until_passed(entry, entry_path) {
-			marked := tutor_exercise.progress_load(context.allocator)
+		switch attempt(&loop, &session) {
+		case .Advance:
+			marked := tutor_exercise.progress_load(course, context.allocator)
 			tutor_exercise.progress_mark(&marked, entry.exercise.id, context.allocator)
-			if !tutor_exercise.progress_save(marked) {
+			if !tutor_exercise.progress_save(course, marked) {
 				fmt.eprintln("PROGRESS_UNWRITABLE: could not record that you finished this one.")
 			}
-			fmt.println("Done. Moving on.")
-			continue
+		case .Quit:
+			return 0
 		}
-		return 0
 	}
 }
 
-// watch_until_passed runs the exercise now and on every save.
+Outcome :: enum {
+	Advance,
+	Quit,
+}
+
+// inside_course shortens a path to the course it is in.
 //
-// Returns true when it passed. Polling on the modification time, because the
-// alternative is a per-platform notification API and a dependency that Rule 10
-// would make us justify for every platform, to save a 300 ms wait.
-watch_until_passed :: proc(entry: tutor_exercise.Entry, entry_path: string) -> bool {
-	last: i64 = 0
-	for {
-		if run_exercise(entry, entry_path) {
-			return true
+// `exercises/04-structs/start.odin` is a path the student can type, open, and
+// recognise. The absolute one is the same information with the part they
+// already know spelled out, on a line that is on screen at all times.
+inside_course :: proc(course: tutor_exercise.Course, path: string) -> string {
+	if course.root == "" || !strings.has_prefix(path, course.root) {
+		return path
+	}
+	return strings.trim_left(path[len(course.root):], "/")
+}
+
+// attempt stays on one exercise until it is finished or the student leaves.
+//
+// Two things can interrupt the wait: a save, and a key. They are polled in the
+// same loop because the read gives up after a tenth of a second, so neither has
+// to wait for the other — the student can press `h` while the file is untouched,
+// and a save is noticed while no key is being pressed.
+attempt :: proc(l: ^Loop, session: ^tutor_tui.Session) -> Outcome {
+	turn: for {
+		evaluate(l)
+
+		if !l.interactive {
+			// No keyboard, so nobody to ask. Advancing on a pass is the only
+			// behaviour left that makes progress; it is stated rather than
+			// silently different from the interactive loop.
+			if l.solved {
+				fmt.println("Done. Moving on (no terminal to wait for a key on).")
+				return .Advance
+			}
+			fmt.println()
+			fmt.println("watching for your next save — Ctrl-C to stop")
+			await_save(l)
+			continue turn
 		}
-		fmt.println()
-		fmt.println("watching for your next save — Ctrl-C to stop")
-		last = modified_at(entry_path)
+
+		footer(l)
+		last := modified_at(l.entry_path)
 		for {
-			time.sleep(300 * time.Millisecond)
-			now := modified_at(entry_path)
-			if now != last && now != 0 {
-				break
+			if now := modified_at(l.entry_path); now != last && now != 0 {
+				continue turn
+			}
+			key := tutor_tui.poll_key()
+			if key == 0 {
+				continue
+			}
+			switch key {
+			case 'q', 'Q':
+				return .Quit
+			case 'n', 'N':
+				if l.solved {
+					return .Advance
+				}
+				// Not an error, and not silence either: the key is not on the
+				// bar because it does nothing yet, and saying so is shorter
+				// than letting the student wonder whether it was read.
+				fmt.println("Not done yet — `n` moves on once every assertion passes.")
+				footer(l)
+			case 'h', 'H':
+				show_hint(l)
+				footer(l)
+			case 'l', 'L':
+				show_list(l)
+				footer(l)
+			case 'c', 'C':
+				check_all(l)
+				footer(l)
+			case 'x', 'X':
+				if restore(l) {
+					continue turn
+				}
+				footer(l)
+			case 't', 'T':
+				show_picture(l, session)
+				report(l)
+				footer(l)
+			case:
+				footer(l)
 			}
 		}
-		fmt.println()
 	}
 }
 
-// run_exercise is one turn of the loop: build, trace, validate, report.
-run_exercise :: proc(entry: tutor_exercise.Entry, entry_path: string) -> bool {
-	results, ok := check_once(entry.exercise, entry_path)
-	if !ok {
-		return false
+// await_save blocks until the file changes.
+//
+// Polling on the modification time, because the alternative is a per-platform
+// notification API and a dependency that Rule 10 would make us justify for every
+// platform, to save a 300 ms wait.
+await_save :: proc(l: ^Loop) {
+	last := modified_at(l.entry_path)
+	for {
+		time.sleep(300 * time.Millisecond)
+		now := modified_at(l.entry_path)
+		if now != last && now != 0 {
+			return
+		}
+	}
+}
+
+// welcome is the first-run explanation, shown once per course.
+welcome :: proc(l: ^Loop) {
+	progress := tutor_exercise.progress_load(l.course, context.allocator)
+	if progress.welcomed {
+		return
+	}
+	if l.interactive {
+		os.write_string(os.stdout, tutor_tui.CLEAR)
+	}
+	fmt.println(tutor_render.WELCOME)
+	if l.interactive {
+		fmt.println()
+		fmt.println("Press any key to begin.")
+		for tutor_tui.poll_key() == 0 {
+		}
+	}
+	progress.welcomed = true
+	if !tutor_exercise.progress_save(l.course, progress) {
+		// Not fatal. Seeing this twice is a smaller failure than refusing to
+		// start because a state file could not be written.
+		fmt.eprintln("PROGRESS_UNWRITABLE: this introduction will be shown again next time.")
+	}
+}
+
+// evaluate is one turn of the loop: build, trace, validate, and draw.
+//
+// The screen is cleared BEFORE the program is built, never after. The compiler
+// writes its diagnostics as it goes, and a redraw that happened afterwards would
+// wipe the one thing on screen the student most needs to read.
+evaluate :: proc(l: ^Loop) {
+	// Everything a turn allocates is temporary and lives exactly one turn. The
+	// loop's own strings are on the heap allocator, so this is safe here and
+	// nowhere further in.
+	free_all(context.temp_allocator)
+
+	clear(l)
+	header(l)
+
+	results, observations, ok := check_once(l.entry.exercise, l.entry_path)
+	l.results = results
+	l.observations = observations
+	l.ran = ok
+	l.solved = ok && tutor_exercise.passed(results)
+	l.step = 1
+	for r in results {
+		if r.verdict != .Pass && r.step > 0 {
+			l.step = r.step
+			break
+		}
+	}
+	verdicts(l)
+}
+
+// report redraws the same screen without running anything, for when the step
+// player has been over the top of it.
+report :: proc(l: ^Loop) {
+	clear(l)
+	header(l)
+	verdicts(l)
+}
+
+clear :: proc(l: ^Loop) {
+	if l.interactive {
+		os.write_string(os.stdout, tutor_tui.CLEAR)
+	}
+}
+
+// header is which exercise this is and what it is for.
+header :: proc(l: ^Loop) {
+	fmt.printfln("── %s ── %s", l.entry.exercise.id, l.entry.exercise.title)
+	fmt.println(l.entry.exercise.objective)
+
+	// Advisory, never a refusal. A student who jumps ahead is not wrong.
+	progress := tutor_exercise.progress_load(l.course, context.temp_allocator)
+	missing := tutor_exercise.missing_requirements(l.entry, progress, context.temp_allocator)
+	if len(missing) > 0 {
+		fmt.printfln("(this one builds on %s, which you have not finished — carry on if you like)",
+			strings.join(missing, ", ", context.temp_allocator))
+	}
+	fmt.println()
+}
+
+// verdicts is what the last run found, and what to do about it.
+verdicts :: proc(l: ^Loop) {
+	if !l.ran {
+		// The compiler's or the debugger's own message has already been printed,
+		// by whatever failed. Repeating it in other words would only give the
+		// student two accounts of one problem.
+		return
 	}
 
 	undetermined := 0
+	// The first problem THAT HAPPENED AT A STEP, which is not always the first
+	// problem: "no step satisfied this" is a verdict about the whole run and has
+	// no step to open. Offering to show step 0 would open the wrong picture.
 	first_problem := -1
-	for r, i in results {
+	for r, i in l.results {
 		switch r.verdict {
 		case .Pass:
 			fmt.printfln("  pass          %s", r.id)
 		case .Fail:
 			fmt.printfln("  FAIL          %s  %s", r.id, r.reason)
-			if first_problem < 0 {
-				first_problem = i
-			}
 		case .Undetermined:
 			undetermined += 1
 			fmt.printfln("  undetermined  %s  %s", r.id, r.reason)
-			if first_problem < 0 {
-				first_problem = i
-			}
+		}
+		if r.verdict != .Pass && r.step > 0 && first_problem < 0 {
+			first_problem = i
 		}
 	}
+	fmt.println()
 
-	if tutor_exercise.passed(results) {
-		return true
+	if l.solved {
+		fmt.println("Exercise done ✓")
+		if solution := solution_path(l); solution != "" {
+			// It exists in every exercise and was never mentioned before this.
+			fmt.printfln("Solution for comparison: %s", solution)
+		}
+		fmt.println("When done experimenting, enter `n` to move on.")
+		return
 	}
 
-	// Point at the step, not just at the assertion. The Result already carries
-	// which step decided it, and a student who can open the picture there is
-	// being shown the answer rather than told about it.
-	if first_problem >= 0 && results[first_problem].step > 0 {
-		fmt.println()
+	// Point at the step, not just at the assertion. The Result carries which
+	// step decided it, and a student who can open the picture there is being
+	// shown the answer rather than told about it (SPEC-EX-020).
+	if first_problem >= 0 {
 		fmt.printfln(
-			"  %s was decided at step %d. To look at it:",
-			results[first_problem].id, results[first_problem].step,
+			"%s was decided at step %d — press `t` to look at it.",
+			l.results[first_problem].id, l.results[first_problem].step,
 		)
-		fmt.printfln("      odin-tutor trace %s /tmp/step.json", entry_path)
-		fmt.printfln("      odin-tutor play /tmp/step.json      (then g, %d)",
-			results[first_problem].step)
+	} else {
+		fmt.println("Press `t` to watch the program you just ran, step by step.")
 	}
 	if undetermined > 0 {
-		fmt.println()
 		fmt.println(
-			"  Some assertions could not be decided. That is a limit of this tool, " +
+			"Some assertions could not be decided. That is a limit of this tool, " +
 			"not a mistake in your program.",
 		)
 	}
-	if len(entry.exercise.hints) > 0 {
-		fmt.println()
-		fmt.println("  Stuck? `odin-tutor hint`")
+}
+
+// footer is the progress bar, the path, and the keys.
+//
+// Every line of it comes from tutor_render, which is the single formatter
+// (SPEC-TUI-051). This procedure decides WHICH keys are live and nothing about
+// how any of it looks.
+footer :: proc(l: ^Loop) {
+	if !l.interactive {
+		return
+	}
+	fmt.println()
+	fmt.println(
+		tutor_render.footer(
+			tutor_render.Footer {
+				done = l.done,
+				total = l.total,
+				path = l.shown,
+				solved = l.solved,
+				showable = l.ran,
+			},
+			context.temp_allocator,
+		),
+	)
+}
+
+solution_path :: proc(l: ^Loop) -> string {
+	path, err := filepath.join({l.entry.directory, "solution.odin"}, context.temp_allocator)
+	if err != nil || !os.exists(path) {
+		return ""
+	}
+	return inside_course(l.course, path)
+}
+
+show_hint :: proc(l: ^Loop) {
+	fmt.println()
+	if len(l.entry.exercise.hints) == 0 {
+		fmt.printfln("%s has no hints written yet.", l.entry.exercise.id)
+		return
+	}
+	for name in l.entry.exercise.hints {
+		path, err := filepath.join({l.entry.directory, name}, context.temp_allocator)
+		if err != nil {
+			continue
+		}
+		data, read_err := os.read_entire_file(path, context.temp_allocator)
+		if read_err != nil {
+			fmt.eprintfln("HINT_UNREADABLE: %s is named by the exercise and is not there.", path)
+			return
+		}
+		fmt.println(string(data))
+		return
+	}
+}
+
+show_list :: proc(l: ^Loop) {
+	fmt.println()
+	print_list(l.course)
+}
+
+// check_all runs every exercise, and records the ones that pass.
+//
+// The student who has been editing several files ahead gets them all counted,
+// which is the only way the count can be honest about work the loop did not
+// watch happen.
+check_all :: proc(l: ^Loop) {
+	entries := tutor_exercise.discover(l.course, context.temp_allocator)
+	fmt.println()
+	fmt.printfln("Checking all %d exercises. Each one is built and run — this takes a while.", len(entries))
+	fmt.println()
+
+	progress := tutor_exercise.progress_load(l.course, context.allocator)
+	changed := false
+	for entry in entries {
+		path, err := filepath.join(
+			{entry.directory, entry.exercise.entry}, context.temp_allocator,
+		)
+		if err != nil {
+			continue
+		}
+		results, _, ok := check_once(entry.exercise, path)
+		if ok && tutor_exercise.passed(results) {
+			fmt.printfln("  pass  %s", entry.exercise.id)
+			if !tutor_exercise.is_done(progress, entry.exercise.id) {
+				tutor_exercise.progress_mark(&progress, entry.exercise.id, context.allocator)
+				changed = true
+			}
+		} else {
+			fmt.printfln("  not   %s", entry.exercise.id)
+		}
+	}
+	if changed && !tutor_exercise.progress_save(l.course, progress) {
+		fmt.eprintln("PROGRESS_UNWRITABLE: what just passed was not recorded.")
+	}
+	recount(l)
+}
+
+// recount refreshes the bar after something other than this exercise changed it.
+recount :: proc(l: ^Loop) {
+	entries := tutor_exercise.discover(l.course, context.temp_allocator)
+	l.total = len(entries)
+	l.done = 0
+	for e in entries {
+		if e.done {
+			l.done += 1
+		}
+	}
+}
+
+// restore puts the exercise back the way it was handed over.
+restore :: proc(l: ^Loop) -> bool {
+	fmt.println()
+	switch tutor_exercise.reset(l.course, l.entry) {
+	case .None:
+		fmt.printfln("Reset %s to the way it started.", l.shown)
+		return true
+	case .No_Original:
+		// Honest about the one case it cannot serve, rather than inventing a
+		// file or telling the student to learn git for it.
+		fmt.println(
+			"NO_ORIGINAL: this course was not made by `odin-tutor init`, so there is no " +
+			"untouched copy to restore from.",
+		)
+	case .Unwritable:
+		fmt.printfln("UNWRITABLE: could not write %s.", l.entry_path)
 	}
 	return false
 }
 
+// show_picture opens the step player where the assertion was decided.
+//
+// The trace is rebuilt from the observation stream the last run already wrote,
+// so pressing `t` runs nothing: no compiler, no debugger, no second execution of
+// the student's program (SPEC-PERF-001).
+show_picture :: proc(l: ^Loop, session: ^tutor_tui.Session) {
+	if !l.ran {
+		return
+	}
+	data, read_err := os.read_entire_file(l.observations, context.temp_allocator)
+	if read_err != nil {
+		fmt.eprintln("OBSERVATIONS_MISSING: there is nothing recorded to show.")
+		return
+	}
+	stream, decode_err := tutor_obs.decode(data)
+	if decode_err != .None {
+		fmt.eprintln("OBSERVATION_MALFORMED: the recorded run could not be read back.")
+		return
+	}
+
+	assembly: tutor_model.Assembly
+	if tutor_model.assembly_init(&assembly) != nil {
+		fmt.eprintln("OUT_OF_MEMORY: could not reserve the assembly arena.")
+		return
+	}
+	defer tutor_model.assembly_destroy(&assembly)
+
+	trace, build_err := tutor_model.assemble(&assembly, stream)
+	if build_err != .None {
+		fmt.eprintln("BUDGET_DISAGREEMENT: the recorded run cannot be turned into a picture.")
+		return
+	}
+
+	source: []string
+	if text, err := os.read_entire_file(l.entry_path, context.temp_allocator); err == nil {
+		source = strings.split_lines(string(text), context.temp_allocator)
+	}
+
+	// The player owns the terminal while it is up: it takes the whole screen and
+	// blocks on each key, which is the opposite of what this loop needs.
+	tutor_tui.leave(session)
+	tutor_tui.run(trace, source, tutor_render.FANCY, l.step - 1)
+	l.interactive = tutor_tui.enter(session, .Keys)
+}
+
 // cmd_list shows the whole course, done and not done.
-cmd_list :: proc(root: string) -> int {
-	entries := tutor_exercise.discover(root, context.temp_allocator)
+cmd_list :: proc(course: tutor_exercise.Course) -> int {
+	return print_list(course)
+}
+
+print_list :: proc(course: tutor_exercise.Course) -> int {
+	entries := tutor_exercise.discover(course, context.temp_allocator)
 	if len(entries) == 0 {
-		fmt.eprintfln("NO_EXERCISES: no exercises found under %s/.", root)
+		fmt.eprintfln("NO_EXERCISES: no exercises found under %s/.", course.exercises)
+		fmt.eprintln("Run `odin-tutor init` to make yourself a copy of the course.")
 		return 1
 	}
 	done := 0
@@ -595,13 +1031,18 @@ cmd_list :: proc(root: string) -> int {
 		fmt.printfln("  %s  %-28s %s", mark, entry.exercise.id, entry.exercise.title)
 	}
 	fmt.println()
+	fmt.printfln(
+		"Progress: %s  %d/%d",
+		tutor_render.progress_bar(done, len(entries), 0, context.temp_allocator),
+		done, len(entries),
+	)
 	fmt.printfln("%d of %d finished.", done, len(entries))
 	return 0
 }
 
 // cmd_hint prints the next hint for the exercise the student is on.
-cmd_hint :: proc(root: string) -> int {
-	entries := tutor_exercise.discover(root, context.temp_allocator)
+cmd_hint :: proc(course: tutor_exercise.Course) -> int {
+	entries := tutor_exercise.discover(course, context.temp_allocator)
 	entry, remaining := tutor_exercise.next_unfinished(entries)
 	if !remaining {
 		fmt.println("Nothing left to hint at — every exercise is done.")
@@ -625,6 +1066,34 @@ cmd_hint :: proc(root: string) -> int {
 		return 0
 	}
 	return 0
+}
+
+// cmd_reset puts the exercise the student is on back to its starting state.
+//
+// The same thing `x` does inside the loop, for the student who has already quit
+// and does not want to start the loop again to undo one file.
+cmd_reset :: proc(course: tutor_exercise.Course) -> int {
+	entries := tutor_exercise.discover(course, context.temp_allocator)
+	entry, remaining := tutor_exercise.next_unfinished(entries)
+	if !remaining {
+		fmt.println("Every exercise is done — there is nothing you are in the middle of.")
+		return 0
+	}
+	switch tutor_exercise.reset(course, entry) {
+	case .None:
+		fmt.printfln("Reset %s to the way it started.", entry.exercise.id)
+		return 0
+	case .No_Original:
+		fmt.eprintln(
+			"NO_ORIGINAL: this course was not made by `odin-tutor init`, so there is no " +
+			"untouched copy to restore from.",
+		)
+		return 1
+	case .Unwritable:
+		fmt.eprintfln("UNWRITABLE: could not write inside %s.", entry.directory)
+		return 1
+	}
+	return 1
 }
 
 // cmd_check builds an exercise's entry file, traces it, and reports every
@@ -705,17 +1174,22 @@ modified_at :: proc(path: string) -> i64 {
 // Split out so the one-shot `check` command and the student's loop share it.
 // Two implementations of "run this exercise" would drift, and the one the
 // student uses is the one that matters.
+//
+// It returns the observation stream's path as well as the verdicts, so that the
+// loop's `t` can draw the picture from the run that just happened rather than
+// running the student's program a second time.
 check_once :: proc(
 	exercise: tutor_exercise.Exercise,
 	entry_path: string,
 ) -> (
-	[]tutor_exercise.Result,
-	bool,
+	results: []tutor_exercise.Result,
+	observations_path: string,
+	ok: bool,
 ) {
 	report, versions := examine(context.temp_allocator)
 	if report.failure != .None {
 		fmt.eprintln(tutor_preflight.explain(report.failure, context.temp_allocator))
-		return nil, false
+		return nil, "", false
 	}
 
 	built, build_failure := tutor_toolchain.build(entry_path, versions, context.temp_allocator)
@@ -726,15 +1200,16 @@ check_once :: proc(
 			fmt.eprint(built.diagnostics)
 		}
 		fmt.eprintln(tutor_toolchain.explain(build_failure, context.temp_allocator))
-		return nil, false
+		return nil, "", false
 	}
 
 	work := strings.concatenate({built.executable, ".check"}, context.temp_allocator)
+	observations_path = strings.concatenate({work, ".observations"}, context.temp_allocator)
 	_, trace_failure := tutor_toolchain.trace(
 		tutor_toolchain.Trace_Request{
 			executable        = built.executable,
 			source_path       = entry_path,
-			observations_path = strings.concatenate({work, ".observations"}, context.temp_allocator),
+			observations_path = observations_path,
 			stdout_path       = strings.concatenate({work, ".stdout"}, context.temp_allocator),
 			adapter_path      = adapter_location(context.temp_allocator),
 			versions          = versions,
@@ -743,41 +1218,40 @@ check_once :: proc(
 	)
 	if trace_failure != .None {
 		fmt.eprintln(tutor_toolchain.explain(trace_failure, context.temp_allocator))
-		return nil, false
+		return nil, "", false
 	}
 
-	observations, obs_err := os.read_entire_file(
-		strings.concatenate({work, ".observations"}, context.temp_allocator),
-		context.temp_allocator,
-	)
+	observations, obs_err := os.read_entire_file(observations_path, context.temp_allocator)
 	if obs_err != nil {
 		fmt.eprintln("OBSERVATIONS_MISSING: the adapter wrote nothing.")
-		return nil, false
+		return nil, "", false
 	}
 	stream, decode_err := tutor_obs.decode(observations)
 	if decode_err != .None {
 		fmt.eprintln("OBSERVATION_MALFORMED: the adapter's output is not valid JSON.")
-		return nil, false
+		return nil, "", false
 	}
 
 	assembly: tutor_model.Assembly
 	if tutor_model.assembly_init(&assembly) != nil {
 		fmt.eprintln("OUT_OF_MEMORY: could not reserve the assembly arena.")
-		return nil, false
+		return nil, "", false
 	}
 	defer tutor_model.assembly_destroy(&assembly)
 
 	trace, build_err := tutor_model.assemble(&assembly, stream)
 	if build_err != .None {
 		fmt.eprintln("BUDGET_DISAGREEMENT: the adapter reports different limits from this build.")
-		return nil, false
+		return nil, "", false
 	}
 
-	return tutor_exercise.evaluate(exercise, trace, context.temp_allocator), true
+	return tutor_exercise.evaluate(exercise, trace, context.temp_allocator),
+		observations_path,
+		true
 }
 
 run_check :: proc(exercise: tutor_exercise.Exercise, entry_path: string) -> int {
-	results, ok := check_once(exercise, entry_path)
+	results, _, ok := check_once(exercise, entry_path)
 	if !ok {
 		return 1
 	}

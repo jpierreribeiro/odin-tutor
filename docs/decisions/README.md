@@ -26,11 +26,18 @@ person needs the reasoning rather than the result.
 | [ADR-012](ADR-012-single-threaded-target.md) | A second thread ends the trace with a terminal condition | accepted | With two threads, memory changes with no line responsible | Yes, but tracing threads needs a different model, not a flag |
 | [ADR-013](ADR-013-odin-conventions.md) | Odin conventions: errors last, arena per trace, `tutor_*` package names, no `using`/`any` | accepted | Otherwise every contributor decides these again, differently | Cheaply, but a mixed codebase is the cost |
 | [ADR-014](ADR-014-maps-are-counted-not-walked.md) | A map is recorded with its count; its entries are `unknown` and the model does not walk it | accepted | Decoding a private layout shows wrong pairs when wrong, and fails silently on a toolchain update | Yes, if Odin ever gives a debugger real map access |
+| [ADR-015](ADR-015-the-student-ends-the-lesson.md) | A solved exercise waits for `n` instead of advancing itself | accepted | A pass is evidence about the assertions, not about whether the student has finished looking | Yes, cheaply — but it would remove the moment the picture is worth opening |
 
 [ADR-000](ADR-000-template.md) is the template. It is not a decision.
 
 ADR-011 and ADR-012 were written **after** the consistency review, to close the
 two defects it found. Their presence is the review doing its job.
+
+ADR-015 was written because a behaviour was found that **nobody had chosen**.
+The loop advanced by itself, not by decision but because that is what the first
+version happened to do. Putting `rustlings` beside this tool asked the question
+the plan never had. A record exists here so the answer is a choice with a cost
+written down, rather than the residue of whichever was easier to write.
 
 ADR-014 was written **before** Phase 2 touched maps, to close
 [R-20](../RISKS.md#r-20). The behaviour it records was already the adapter's,
