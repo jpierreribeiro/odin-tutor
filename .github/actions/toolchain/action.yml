@@ -23,9 +23,28 @@ runs:
     # `pinned` and `latest` both name a different toolchain over time, and a
     # cache keyed on either WORD would freeze the very thing this project
     # refuses to assume is constant (ADR-009).
+    #
+    # The token matters: unauthenticated API requests are limited PER IP
+    # ADDRESS, which runners share with everyone else on them. The first run of
+    # this workflow took a 403 on the macOS job while the Linux jobs beside it
+    # were fine.
+    #
+    # And the tag is checked before it is written. Writing an empty one is how
+    # that 403 arrived three steps later as a usage message about arguments,
+    # from a step that had reported success.
     - id: resolve
       shell: bash
-      run: echo "tag=$(./ci/install-odin.sh --resolve '${{ inputs.odin }}')" >> "$GITHUB_OUTPUT"
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+      run: |
+        set -euo pipefail
+        tag=$(./ci/install-odin.sh --resolve '${{ inputs.odin }}')
+        if [ -z "$tag" ]; then
+          echo "::error::no Odin release resolved for '${{ inputs.odin }}'"
+          exit 1
+        fi
+        echo "resolved ${{ inputs.odin }} to $tag"
+        echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
     - uses: actions/cache@v4
       with:
@@ -33,7 +52,10 @@ runs:
         key: odin-${{ runner.os }}-${{ runner.arch }}-${{ steps.resolve.outputs.tag }}
 
     - shell: bash
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
       run: |
+        set -euo pipefail
         ./ci/install-odin.sh '${{ steps.resolve.outputs.tag }}' '${{ runner.temp }}/odin'
         echo "ODIN_ROOT=${{ runner.temp }}/odin" >> "$GITHUB_ENV"
 

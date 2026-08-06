@@ -18,6 +18,37 @@ set -e
 
 say() { echo "$@" >&2; }
 
+# api asks the GitHub API, with a token when one is available and with retries.
+#
+# Unauthenticated requests are limited to 60 an hour PER IP ADDRESS, and CI
+# runners share addresses with every other project on them. The first run of
+# this workflow hit a 403 on the macOS job for exactly that reason, while the
+# Linux jobs beside it succeeded — a failure that depends on who else is busy.
+#
+# A token raises the limit to a thousand an hour for this repository. The
+# retries are for the case where even that is exhausted, or the API is briefly
+# unreachable, and they are bounded: a toolchain that cannot be resolved must
+# fail the job, not stall it.
+api() {
+	token="${GH_TOKEN:-${GITHUB_TOKEN:-}}"
+	attempt=1
+	while [ "$attempt" -le 3 ]; do
+		if [ -n "$token" ]; then
+			curl -sSfL -H "Authorization: Bearer $token" \
+				-H "X-GitHub-Api-Version: 2022-11-28" "$1" && return 0
+		else
+			curl -sSfL "$1" && return 0
+		fi
+		say "the GitHub API did not answer (attempt $attempt of 3): $1"
+		attempt=$((attempt + 1))
+		[ "$attempt" -le 3 ] && sleep $((attempt * 5))
+	done
+	say "giving up on $1"
+	say "If this is a 403, it is the rate limit for unauthenticated requests, which"
+	say "is per IP address. Set GITHUB_TOKEN or GH_TOKEN and try again."
+	return 1
+}
+
 # release_json prints the release object for a spec: `latest`, an index, or a tag.
 #
 # The GitHub API is asked rather than a URL being built, because the asset names
@@ -39,20 +70,30 @@ release_json() {
 		release_json "$(tr -d ' \t\n' < "$(dirname "$0")/pinned-odin.txt")"
 		;;
 	latest)
-		curl -sSfL "https://api.github.com/repos/odin-lang/Odin/releases/latest"
+		api "https://api.github.com/repos/odin-lang/Odin/releases/latest"
 		;;
 	[0-9] | [0-9][0-9])
-		curl -sSfL "https://api.github.com/repos/odin-lang/Odin/releases?per_page=20" |
+		api "https://api.github.com/repos/odin-lang/Odin/releases?per_page=20" |
 			python3 -c 'import json,sys; print(json.dumps(json.load(sys.stdin)['"$spec"']))'
 		;;
 	*)
-		curl -sSfL "https://api.github.com/repos/odin-lang/Odin/releases/tags/$spec"
+		api "https://api.github.com/repos/odin-lang/Odin/releases/tags/$spec"
 		;;
 	esac
 }
 
 if [ "$1" = "--resolve" ]; then
-	release_json "${2:-latest}" | python3 -c 'import json,sys; print(json.load(sys.stdin)["tag_name"])'
+	# An EMPTY answer must not leave here with a zero exit code. The first run of
+	# this project's CI resolved nothing, reported success, and handed the empty
+	# string to the installer, which then failed with a usage message about
+	# arguments — three steps away from the 403 that actually happened.
+	tag=$(release_json "${2:-latest}" |
+		python3 -c 'import json,sys; print(json.load(sys.stdin)["tag_name"])' 2>/dev/null || true)
+	if [ -z "$tag" ]; then
+		say "could not resolve an Odin release for '${2:-latest}'"
+		exit 1
+	fi
+	echo "$tag"
 	exit 0
 fi
 
