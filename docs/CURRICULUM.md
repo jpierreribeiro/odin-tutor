@@ -47,7 +47,7 @@ separates them. That is the whole argument for this project in one screen.
 
 ## 2. Mapping
 
-Twenty-seven exercises, against the overview's own section names.
+Twenty-eight exercises, against the overview's own section names.
 
 | Overview section | Exercise | What the picture adds |
 |---|---|---|
@@ -65,6 +65,7 @@ Twenty-seven exercises, against the overview's own section names.
 | Dynamic arrays | `14-dynamic-arrays` | Capacity against length, two numbers that differ. |
 | `string` type, string iteration | `15-strings`, `16-utf8` | A string as `{data, len}`, and bytes against characters. |
 | Multiple results | `20-errors` | The failure as a second slot, not as prose. |
+| SOA data types | `28-soa` | The only edit is `#soa`, and the code reads the same. One array per field instead of one struct per element — an arrangement nothing in the source shows. |
 | Unions, type switch | `27-unions` | One member, named by the type it holds. The struct-with-a-flag version prints the same and can be in states a union cannot. |
 | `or_return` | `21-or-return` | The error leaving on its own, instead of a zero that looks like an answer. |
 | `string` type conversions | `22-string-copy` | Assigning a string hands over a second view of the same bytes; `strings.clone` makes a second set. Both print the same lengths. |
@@ -78,15 +79,14 @@ Twenty-seven exercises, against the overview's own section names.
 ## 3. What will not become an exercise, and why
 
 Each line below was **tried and probed**, not assumed. This section exists so
-that "there are only twenty-seven" reads as a decision with reasons rather than
+that "there are only twenty-eight" reads as a decision with reasons rather than
 as a gap.
 
 | Overview section | Why not |
 |---|---|
 | Maps | Entries are unreadable through the debugger on this toolchain, so only the count is visible ([R-20](RISKS.md#r-20), [ADR-014](decisions/ADR-014-maps-are-counted-not-walked.md)). |
 | `defer` | A leak is invisible here by construction: absence from the reachable set is not evidence of anything ([ADR-011](decisions/ADR-011-absence-is-not-evidence.md)), and `defer`'s ordering is an output fact. The picture adds nothing the text does not say. |
-| `#soa` | Shared the nested-struct defect ([R-23](RISKS.md#r-23)), which is fixed. Not re-probed since — a candidate now rather than a blocked one. |
-| Fixed-array CONTENTS — array arithmetic, swizzles | The element accessor ([SPEC-VAL-026](VALIDATION-SPEC.md#spec-val-026)) unblocked slices and dynamic arrays, and `25-in-place` and `26-sorting` came straight out of it. A fixed array of scalars is still recorded as one compact text with no elements ([R-26](RISKS.md#r-26)), so exercises about contents are written against slices for now. |
+| Array arithmetic, swizzles | Nothing blocks these now — [R-26](RISKS.md#r-26) gave fixed arrays their elements. They are simply not written yet, and they are the next ones to write. |
 | `distinct` types | Probed: a distinct scalar renders exactly like its base type, so the picture cannot show the difference the type system makes. |
 | Implicit context | Filtered out of the picture on purpose. |
 | Comments, packages, attributes, build tags, foreign, calling conventions, `when` | Prose, tooling, or compile-time. Nothing to see in memory. |

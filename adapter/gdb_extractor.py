@@ -324,9 +324,67 @@ def read_value(value, depth=0):
     if t.code == gdb.TYPE_CODE_STRUCT:
         return read_struct(value, t, type_name, depth)
     if t.code == gdb.TYPE_CODE_ARRAY:
-        return {"state": VALID, "kind": K_FIXED, "type_name": type_name, "text": str(value)}
+        return read_fixed_array(value, t, type_name, depth)
 
     return unknown(type_name, "no rule for this shape")
+
+
+def read_fixed_array(value, t, type_name, depth):
+    """Read a fixed array: WHERE IT IS, and what is in it.
+
+    It used to report one line of text and nothing else - no address, no
+    elements. Both omissions were defects, and the address was the worse one:
+    with no address, every fixed array of one type minted the same identity, so
+
+        a := [3]int{1, 2, 3}
+        b := [3]int{7, 8, 9}
+
+    drew ONE object holding `{7, 8, 9}` that both `a` and `b` pointed at. Two
+    distinct arrays shown as one, with the wrong contents, in the picture that
+    `03-fixed-arrays` teaches from.
+
+    The length comes from the TYPE, not from the target's memory, so there is no
+    untrusted length to validate here - the case SPEC-SAFE-010 exists for cannot
+    arise. It is still bounded by the `elements` budget, and a cut is recorded.
+
+    The compact text is kept only when the elements could not be read. Showing
+    both is saying the same thing twice, and a slice already shows elements
+    alone.
+    """
+    # The compact text is the FALLBACK, not a second copy. A slice shows its
+    # elements and no summary line; an array that shows both says everything
+    # twice.
+    out = {
+        "state": VALID, "kind": K_FIXED, "type_name": type_name,
+        "text": str(value),
+        "address": holder_address(value),
+    }
+    try:
+        low, high = t.range()
+        length = int(high) - int(low) + 1
+    except Exception:
+        return out
+    if length <= 0:
+        return out
+
+    out["length"] = length
+    take = note_read("elements", min(length, BUDGETS["elements"]))
+    elements = []
+    try:
+        for i in range(take):
+            elements.append(read_value(value[i], depth + 1))
+    except gdb.MemoryError as exc:
+        return unreadable(type_name, str(exc))
+    except Exception:  # noqa: BLE001
+        return out
+    if elements:
+        out["members"] = [
+            {"name": "[%d]" % i, "value": element}
+            for i, element in enumerate(elements)
+        ]
+        out["truncated"] = length > take
+        out.pop("text", None)
+    return out
 
 
 def read_struct(value, t, type_name, depth):

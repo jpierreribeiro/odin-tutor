@@ -1,0 +1,17 @@
+{
+  "id": "28-soa",
+  "title": "The same data, arranged the other way",
+  "objective": "Show that #soa stores one array per field instead of one struct per element, and that the picture reads the arrangement rather than the values.",
+  "concepts": ["struct", "array", "field", "data-structure"],
+  "difficulty": 3,
+  "requires": ["09-nested-structs", "03-fixed-arrays"],
+  "entry": "start.odin",
+  "assertions": [
+    { "id": "A1", "at": "any", "expr": "value_of(\"pontos.x[0]\") == \"1\"" },
+    { "id": "A2", "at": "any", "expr": "value_of(\"pontos.x[1]\") == \"2\"" },
+    { "id": "A3", "at": "any", "expr": "field_count(\"pontos\") == 2" },
+    { "id": "A4", "at": "final", "expr": "output_equals(\"1 2\\n\")" }
+  ],
+  "hints": ["hints.md"],
+  "expected_wall_ms": 3000
+}

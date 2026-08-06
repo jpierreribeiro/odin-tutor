@@ -3,7 +3,7 @@
 [![check](https://github.com/jpierreribeiro/odin-tutor/actions/workflows/check.yml/badge.svg)](https://github.com/jpierreribeiro/odin-tutor/actions/workflows/check.yml)
 [![nightly](https://github.com/jpierreribeiro/odin-tutor/actions/workflows/nightly.yml/badge.svg)](https://github.com/jpierreribeiro/odin-tutor/actions/workflows/nightly.yml)
 
-Twenty-seven tiny broken Odin programs. Fix them, and learn how memory actually
+Twenty-eight tiny broken Odin programs. Fix them, and learn how memory actually
 behaves while you do.
 
 **Recommended in parallel with the [official Odin overview](https://odin-lang.org/docs/overview/).**
@@ -138,7 +138,7 @@ never type an exercise name.
 Under every screen:
 
 ```
-Progress: [#####>----------------------------------]  2/27
+Progress: [#####>----------------------------------]  2/28
 Current exercise: exercises/03-fixed-arrays/start.odin
 
 h:hint / t:show me / l:list / c:check all / x:reset / q:quit ?
@@ -196,6 +196,7 @@ Each one accompanies a section of the
 | `25-in-place` | A by-reference loop changes the thing, not a copy of it |
 | `26-sorting` | Sorting in place reorders the buffer everyone else can see |
 | `27-unions` | A union holds one variant at a time, and knows which |
+| `28-soa` | `#soa` stores one array per field, and the code does not change |
 
 **Ten of them print the same thing whether you are right or wrong.** That is
 deliberate: `13-sub-slices`, `17-enums`, `18-varargs`, `19-arenas`, `20-errors`,

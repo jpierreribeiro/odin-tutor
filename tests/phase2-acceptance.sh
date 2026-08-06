@@ -263,6 +263,63 @@ fi
 
 # ---------------------------------------------------------------------------
 echo
+echo "5b. two distinct fixed arrays are two objects, each holding its own values"
+
+# A FALSE PICTURE THAT SHIPPED. A fixed array was recorded as one line of text
+# with no address and no elements, so every fixed array of one type minted the
+# same identity:
+#
+#   a := [3]int{1, 2, 3}
+#   b := [3]int{7, 8, 9}
+#   -> a and b both pointed at ONE object holding {7, 8, 9}
+#
+# Two distinct arrays drawn as one, with the wrong contents, in the picture that
+# `03-fixed-arrays` teaches from. This check exists so it cannot come back
+# quietly.
+mkdir -p "$work/arrays"
+cat > "$work/arrays/two.odin" <<'ODIN'
+package main
+
+import "core:fmt"
+
+main :: proc() {
+	a := [3]int{1, 2, 3}
+	b := [3]int{7, 8, 9}
+	fmt.println(a[0], b[0])
+}
+ODIN
+"$tool" trace "$work/arrays/two.odin" "$work/arrays/two.json" >/dev/null 2>&1 || true
+distinct=$(python3 - "$work/arrays/two.json" <<'SCRIPT'
+import json, sys
+trace = json.load(open(sys.argv[1]))
+best = 0
+for step in trace["steps"]:
+    for frame in step["frames"]:
+        refs = [s.get("refers_to") for s in frame["slots"]
+                if s.get("name") in ("a", "b") and s.get("refers_to")]
+        best = max(best, len(set(refs)))
+print(best)
+SCRIPT
+)
+if [ "$distinct" = "2" ]; then
+	ok "two fixed arrays of one type are two identities"
+else
+	bad "two fixed arrays produced $distinct distinct identities, expected 2" \
+		"One object where the program has two, and the picture would say they alias."
+fi
+
+# And each holds ITS OWN values, read off the screen the student sees.
+steps=$(python3 -c "import json,sys;print(len(json.load(open(sys.argv[1]))['steps']))" "$work/arrays/two.json")
+"$tool" render "$work/arrays/two.json" "$((steps - 1))" > "$work/arrays/screen.txt" 2>&1 || true
+if grep -q '\[0\] = 1' "$work/arrays/screen.txt" && grep -q '\[0\] = 7' "$work/arrays/screen.txt"; then
+	ok "and each one shows its own elements"
+else
+	bad "the arrays' elements are missing, or belong to the wrong array" \
+		"$(sed -n '1,12p' "$work/arrays/screen.txt")"
+fi
+
+# ---------------------------------------------------------------------------
+echo
 echo "6, 7, 8. linear growth, the known-incorrect identity reuse, and identity"
 echo "         across a truncated step"
 

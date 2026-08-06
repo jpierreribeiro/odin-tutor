@@ -902,8 +902,9 @@ reason *two different objects*.
 ---
 
 <a id="r-26"></a>
-### R-26 — A fixed array of scalars is recorded as text, not as elements
-**Class:** MEDIUM · **Status: OPEN, found 2026-08-06**
+### R-26 — A fixed array was recorded as text, with no address and no elements
+**Class:** BLOCKING for the picture's promise · **Status: FIXED 2026-08-06.**
+**It was worse than the class it was filed under.**
 
 A slice records its elements as members named `[0]`, `[1]`, `[2]`. A fixed array
 of scalars records `"text": "{2, 4, 6}"` and no members at all.
@@ -912,16 +913,38 @@ The picture reads the same to a person. It does not to an assertion: with
 [SPEC-VAL-026](VALIDATION-SPEC.md#spec-val-026) an exercise can ask what
 `marks[2]` is when `marks` is a slice, and cannot when it is a `[3]int`.
 
-**Consequence.** Exercises about array contents have to be written against
-slices. That is not a bad constraint — slices are the shape a student meets most
-— but it is a constraint nobody chose, and an exercise author will hit it as a
-silent `undetermined` rather than as a message.
+**The missing elements were the smaller half.** The record also carried NO
+ADDRESS, and identity is a function of address. So every fixed array of one type
+minted the same key:
 
-**The fix is in the adapter**, which already emits elements for anything with a
-`data` pointer and a length. A fixed array has neither; it has a static length in
-its type, which is the very fact `03-fixed-arrays` teaches. Emitting members for
-it would change the observation stream, so it changes the conformance goldens
-and belongs in a change that regenerates them deliberately.
+```odin
+a := [3]int{1, 2, 3}
+b := [3]int{7, 8, 9}
+
+//   a -> [2]
+//   b -> [2]
+//   [2] int [3] {7, 8, 9}
+```
+
+**Two distinct arrays drawn as one object, holding the wrong contents**, in the
+picture `03-fixed-arrays` teaches from. This was filed as MEDIUM — "exercises
+have to be written against slices" — and it was a false picture the whole time.
+It was found by re-probing `#soa` after [R-23](#r-23), which showed the same
+collapse for the `x` and `y` arrays of a `#soa[2]Point`.
+
+**The fix.** `read_fixed_array` in the adapter: the address, and the elements,
+bounded by the `elements` budget. The length comes from the TYPE rather than
+from the target's memory, so the untrusted-length case
+[SPEC-SAFE-010](SAFETY.md) exists for cannot arise here. The compact text is
+kept only as the fallback when elements could not be read — a slice shows its
+elements alone, and an array that showed both said everything twice.
+
+**The regression check is in the phase 2 gate**, not only in a unit test: two
+fixed arrays, two identities, each holding its own elements, read off the
+rendered screen. A false picture that shipped earns an end-to-end check.
+
+**What it unblocked.** `28-soa`, and element assertions on fixed arrays
+everywhere.
 
 ---
 
