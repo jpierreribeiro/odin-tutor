@@ -15,11 +15,11 @@ where it went wrong** — the frames, the variables, which pointer pointed where
 **Recommended in parallel with the [official Odin overview](https://odin-lang.org/docs/overview/).**
 The overview explains the language; these make you write it.
 
-![the exercise loop](docs/images/loop.svg)
+![the exercise loop](docs/images/loop.png)
 
 Press `t`, and the picture opens at the step that decided it:
 
-![the memory picture](docs/images/picture.svg)
+![the memory picture](docs/images/picture.png)
 
 This project is directly inspired by [rustlings](https://github.com/rust-lang/rustlings)
 and [ziglings](https://codeberg.org/ziglings/exercises). The loop is theirs. The
@@ -34,26 +34,14 @@ One takes a window onto an array. The other copies part of it. Every test that
 compares printed output accepts both, so a normal exercise runner cannot tell
 them apart, and neither can you from the output. The memory is not the same:
 
-```
-        parte := todos[1:]                    parte := []int{2, 3}
-        ── a window ──────────────            ── a copy ────────────────
-
-OBJECTS                                  OBJECTS
-  ② struct []int (3)   shares with ④       ② struct []int (3)
-      [0] = 1                                  [0] = 1
-      [1] = 2                                  [1] = 2
-      [2] = 3                                  [2] = 3
-  ④ struct []int (2)   shares with ②       ④ struct []int (2)
-      [0] = 2                                  [0] = 2
-      [1] = 3                                  [1] = 3
-```
+![the same output, different memory](docs/images/contrast.png)
 
 Same values. Same output. One says `shares with`, and that is the whole
-difference: write through `parte` in the left one and `todos` changes too.
+difference: write through `parte` on the left and `todos` changes too.
 
-`②` and `④` are identities, not addresses. Run it again with address
-randomisation on and they are still `②` and `④`, because an address is a fact
-about one run and this is teaching you about the program.
+`[2]` and `[4]` are identities, not addresses. Run it again with address
+randomisation on and they are still `[2]` and `[4]`, because an address is a
+fact about one run and this is teaching you about the program.
 
 **All thirty-three exercises work this way**, and a check in the gate enforces
 it: every wrong answer must be rejected by an assertion about MEMORY, never only
@@ -164,10 +152,12 @@ h:hint / t:show me / l:list / c:check all / x:reset / q:quit ?
 | `x` | Put this exercise back the way it started. |
 | `q` | Stop. Your progress is remembered. |
 
-A solved exercise does **not** vanish. It says `Exercise done ✓`, points at the
-reference solution so you can compare, and keeps watching your file until you
-press `n` — because that is the one moment where the whole run is recorded and
-`t` is one keypress away.
+A solved exercise does **not** vanish. It says so, points at the reference
+solution so you can compare, and keeps watching your file until you press `n` —
+because that is the one moment where the whole run is recorded and `t` is one
+keypress away.
+
+![a solved exercise waits for you](docs/images/done.png)
 
 Your progress lives in your course directory. Two copies of the course do not
 share a count, and deleting the directory deletes everything the tool kept.
@@ -176,6 +166,8 @@ share a count, and deleting the directory deletes everything the tool kept.
 
 Each one accompanies a section of the
 [official overview](https://odin-lang.org/docs/overview/).
+
+![odin-tutor list](docs/images/list.png)
 
 | | |
 |---|---|

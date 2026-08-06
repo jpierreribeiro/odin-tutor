@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="754" height="382" viewBox="0 0 754 382" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="13">
+<rect width="754" height="382" rx="8" fill="#191d24"/>
+<circle cx="20" cy="21" r="6" fill="#e06c62"/>
+<circle cx="40" cy="21" r="6" fill="#e0b562"/>
+<circle cx="60" cy="21" r="6" fill="#8fbf72"/>
+<text x="377.0" y="26" fill="#7a8496" text-anchor="middle" font-size="12">odin-tutor list</text>
+<text x="20" y="42" fill="#d8dee9" xml:space="preserve">  done  01-values                    A variable holds a value</text>
+<text x="20" y="62" fill="#d8dee9" xml:space="preserve">  done  02-control-flow              A loop you can step backwards through</text>
+<text x="20" y="82" fill="#d8dee9" xml:space="preserve">  done  03-fixed-arrays              A fixed array carries its length in its type</text>
+<text x="20" y="102" fill="#d8dee9" xml:space="preserve">  done  04-structs                   Fields are named slots</text>
+<text x="20" y="122" fill="#d8dee9" xml:space="preserve">  done  05-pointers                  A pointer is a reference, not a copy</text>
+<text x="20" y="142" fill="#d8dee9" xml:space="preserve">  done  06-aliasing                  Two names for one object</text>
+<text x="20" y="162" fill="#d8dee9" xml:space="preserve">  done  07-frames                    A call gets its own frame</text>
+<text x="20" y="182" fill="#d8dee9" xml:space="preserve">  done  08-recursion                 A call that calls itself</text>
+<text x="20" y="202" fill="#d8dee9" xml:space="preserve">  done  09-nested-structs            A struct inside a struct</text>
+<text x="20" y="222" fill="#d8dee9" xml:space="preserve">  done  10-new-and-free              An object that exists, and then does not</text>
+<text x="20" y="242" fill="#d8dee9" xml:space="preserve">  done  11-lifetime                  After you give memory back, say so</text>
+<text x="20" y="262" fill="#d8dee9" xml:space="preserve">  done  12-slices                    A slice knows its own length</text>
+<text x="20" y="282" fill="#d8dee9" xml:space="preserve">  ...</text>
+<text x="20" y="302" fill="#d8dee9" xml:space="preserve"></text>
+<text x="20" y="322" fill="#7a8496" xml:space="preserve">Progress: [##############&gt;-------------------------]  12/33</text>
+<text x="20" y="342" fill="#d8dee9" xml:space="preserve">12 of 33 finished.</text>
+</svg>

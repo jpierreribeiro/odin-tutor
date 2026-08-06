@@ -1,22 +1,22 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="401" height="402" viewBox="0 0 401 402" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="13">
-<rect width="401" height="402" rx="8" fill="#191d24"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="409" height="402" viewBox="0 0 409 402" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="13">
+<rect width="409" height="402" rx="8" fill="#191d24"/>
 <circle cx="20" cy="21" r="6" fill="#e06c62"/>
 <circle cx="40" cy="21" r="6" fill="#e0b562"/>
 <circle cx="60" cy="21" r="6" fill="#8fbf72"/>
-<text x="200.5" y="26" fill="#7a8496" text-anchor="middle" font-size="12">odin-tutor — press t, and see the memory</text>
+<text x="204.5" y="26" fill="#7a8496" text-anchor="middle" font-size="12">odin-tutor — press t, and see the memory</text>
 <text x="20" y="42" fill="#88c0d0" xml:space="preserve">STEP 4/5   solution.odin:8   main::main</text>
 <text x="20" y="62" fill="#d8dee9" xml:space="preserve"></text>
 <text x="20" y="82" fill="#88c0d0" xml:space="preserve">FRAMES</text>
 <text x="20" y="102" fill="#d8dee9" xml:space="preserve">  main::main()</text>
-<text x="20" y="122" fill="#d8dee9" xml:space="preserve">    todos → ②</text>
-<text x="20" y="142" fill="#d8dee9" xml:space="preserve">    parte → ④</text>
+<text x="20" y="122" fill="#d8dee9" xml:space="preserve">    todos -&gt; [2]</text>
+<text x="20" y="142" fill="#d8dee9" xml:space="preserve">    parte -&gt; [4]</text>
 <text x="20" y="162" fill="#d8dee9" xml:space="preserve"></text>
 <text x="20" y="182" fill="#88c0d0" xml:space="preserve">OBJECTS</text>
-<text x="20" y="202" fill="#a3be8c" xml:space="preserve">  ② struct []int (3)   shares with ④</text>
+<text x="20" y="202" fill="#a3be8c" xml:space="preserve">  [2] struct []int (3)   shares with [4]</text>
 <text x="20" y="222" fill="#d8dee9" xml:space="preserve">      [0] = 1</text>
 <text x="20" y="242" fill="#d8dee9" xml:space="preserve">      [1] = 2</text>
 <text x="20" y="262" fill="#d8dee9" xml:space="preserve">      [2] = 3</text>
-<text x="20" y="282" fill="#a3be8c" xml:space="preserve">  ④ struct []int (2)   shares with ②</text>
+<text x="20" y="282" fill="#a3be8c" xml:space="preserve">  [4] struct []int (2)   shares with [2]</text>
 <text x="20" y="302" fill="#d8dee9" xml:space="preserve">      [0] = 2</text>
 <text x="20" y="322" fill="#d8dee9" xml:space="preserve">      [1] = 3</text>
 <text x="20" y="342" fill="#d8dee9" xml:space="preserve"></text>
